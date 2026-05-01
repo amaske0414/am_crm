@@ -56,6 +56,14 @@ button:hover {
   color: #ffffff;
 }
 
+button:disabled {
+  color: var(--muted);
+  border-color: var(--border);
+  background: #242424;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 input,
 select,
 textarea {
@@ -185,6 +193,74 @@ textarea:focus {
   height: calc(100vh - 66px);
   overflow: auto;
   padding-bottom: 24px;
+}
+
+#tasksBoard {
+  height: 100%;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  padding: 10px;
+  gap: 8px;
+}
+
+.taskBoardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.taskFilterBar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(5, minmax(120px, 1fr));
+  gap: 6px;
+}
+
+.taskFilterBar input,
+.taskFilterBar select {
+  height: 26px;
+  padding: 0 6px;
+  min-width: 0;
+}
+
+.taskTableWrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+}
+
+#tasksTable {
+  width: 100%;
+  min-width: 1500px;
+  border-collapse: collapse;
+}
+
+#tasksTable th,
+#tasksTable td {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 4px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+  height: 24px;
+}
+
+#tasksTable th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--grid-header-bg);
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+#tasksTable th.sortable {
+  cursor: pointer;
+}
+
+#tasksTable tr:hover td {
+  background: #2a2d2e;
 }
 
 #clientGrid {
@@ -473,6 +549,12 @@ td.stickyCol2 {
   padding: 10px;
 }
 
+.popupActionRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
 .popupGrid {
   display: grid;
   grid-template-columns: 180px 1fr;
@@ -495,6 +577,27 @@ td.stickyCol2 {
   min-height: 64px;
   width: 100%;
   padding: 6px;
+}
+
+.llmPromptBox,
+.llmPreviewBox,
+.llmImportBox {
+  width: 100%;
+  padding: 8px;
+  font-family: var(--font);
+  line-height: 1.35;
+}
+
+.llmPromptBox {
+  min-height: 260px;
+}
+
+.llmPreviewBox {
+  min-height: 360px;
+}
+
+.llmImportBox {
+  min-height: 420px;
 }
 
 .popupTable {
@@ -590,6 +693,19 @@ td.stickyCol2 {
 .checkRow {
   display: block;
   padding: 4px 0;
+}
+
+.setupSteps {
+  margin: 0 0 10px 20px;
+  padding: 0;
+}
+
+.setupSteps li {
+  margin: 4px 0;
+}
+
+.taskRuleCard .popupGrid {
+  grid-template-columns: 170px 1fr;
 }
 
 .relationshipSvg {
