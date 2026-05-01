@@ -1,0 +1,44 @@
+{
+  "ref_ALG": {
+    "grain": "one row per client group ID (aka ALG)",
+    "refreshCadence": "ad-hoc",
+    "recordCount": "80 - 120",
+    "filtersExclusions": null
+  },
+  "data_POSITIONS": {
+    "grain": "one row per position per account",
+    "refreshCadence": "daily",
+    "recordCount": "10,000 - 20,000",
+    "filtersExclusions": null
+  },
+  "data_ACTIVITY": {
+    "grain": "one row per transaction",
+    "refreshCadence": "daily",
+    "recordCount": "variable (1,000 - 100,000)",
+    "filtersExclusions": "excludes trade activity and dividend activity"
+  },
+  "data_REVENUE": {
+    "grain": "one row per account code per product code per date per advisor (Num Emp Fa)",
+    "refreshCadence": "weekly",
+    "recordCount": "variable (80,000 - 120,000)",
+    "filtersExclusions": null
+  },
+  "ref_PRODUCT": {
+    "grain": "one row per product code",
+    "refreshCadence": "ad-hoc",
+    "recordCount": "97 + growth",
+    "filtersExclusions": "missing certain product codes that have never been observed in data_REVENUE"
+  },
+  "ref_SECURITY": {
+    "grain": "one row per security",
+    "refreshCadence": "ad-hoc",
+    "recordCount": "140 + growth",
+    "filtersExclusions": "Only includes securities that data_POSITIONS is unable to classify"
+  },
+  "ref_WEALTHDESK": {
+    "grain": "one row per account",
+    "refreshCadence": "ad-hoc",
+    "recordCount": "500 - 800",
+    "filtersExclusions": "only includes accounts currently enrolled in an advisory program"
+  }
+}

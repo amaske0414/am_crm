@@ -1,0 +1,21 @@
+window.AM_CRM_SEED_CLIENTS = [
+  {
+    "seedRowNumber": 6,
+    "idNameAlg": "ADAM",
+    "status": "A",
+    "lastName": "MASKE",
+    "salutation": "Adam",
+    "emailRaw": "ADAM.MASKE@GMAIL.COM;",
+    "emails": [
+      "ADAM.MASKE@GMAIL.COM"
+    ],
+    "phone": "(312) 858-0858",
+    "reviewLocation": "N/A",
+    "gicAllocation": "MODEL 5",
+    "contactFrequencyRaw": "NONE",
+    "contactFrequencyCode": 0,
+    "reviewFrequencyRaw": "NONE",
+    "reviewFrequencyCode": 0,
+    "lastReviewRaw": null
+  },
+];

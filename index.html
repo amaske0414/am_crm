@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AM_CRM</title>
+  <link rel="stylesheet" href="styles/styles.css">
+</head>
+<body>
+  <div id="appShell">
+    <aside id="sidebar">
+      <div id="iconToolbar" aria-label="Quick actions">
+        <button id="btnSettingsNav" class="navButton iconButton" data-view="settings" title="Settings" aria-label="Settings">&#9881;</button>
+        <button id="btnRefresh" class="iconButton" title="Refresh data">&#8635;</button>
+        <button id="btnBackup" class="iconButton" title="Backup">&#8681;</button>
+        <button id="btnExport" class="iconButton" title="Export grid">&#8681;</button>
+        <button id="btnAddTask" class="iconButton" title="Add task">&#9745;</button>
+        <button id="btnAddNote" class="iconButton" title="Add note">&#9998;</button>
+      </div>
+      <nav id="mainNav" aria-label="Main navigation">
+        <button id="btnHomeNav" class="navButton iconButton active" data-view="home" title="Home" aria-label="Home">&#8962;</button>
+      </nav>
+    </aside>
+
+    <main id="mainContent">
+      <div id="topSearchBar">
+        <input id="globalSearch" type="search" autocomplete="off" placeholder="Search clients, emails, notes...">
+      </div>
+
+      <section id="homeView" class="view active" aria-label="Home">
+        <div id="gridWrap">
+          <table id="clientGrid">
+            <thead></thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+        </div>
+      </section>
+
+      <section id="settingsView" class="view" aria-label="Settings">
+        <div id="settingsLayout">
+          <div id="settingsNav"></div>
+          <div id="settingsPanel"></div>
+        </div>
+      </section>
+
+      <div id="lastRefresh">Last data refresh: never</div>
+    </main>
+
+    <div id="popupLayer"></div>
+  </div>
+
+  <script>window.AM_CRM_XLSX_LOAD_FAILED = false;</script>
+  <script src="lib/xlsx.full.min.js" onerror="window.AM_CRM_XLSX_LOAD_FAILED = true;"></script>
+  <script src="src/generated/schemaCatalog.js"></script>
+  <script src="src/generated/seedClients.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

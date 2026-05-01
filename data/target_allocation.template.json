@@ -1,0 +1,37 @@
+{
+  "description": "Target allocation import shape. Actual target allocation XLSX files can be mapped in Settings > Asset Allocation.",
+  "profiles": [
+    {
+      "riskProfile": "1 - Wealth Conservation",
+      "includeAlts": "Yes",
+      "includeMunis": "Yes",
+      "assetClassTargets": [
+        {
+          "assetClass": "Cash",
+          "targetPercent": 0,
+          "driftThresholdPercent": 5
+        },
+        {
+          "assetClass": "Fixed Income",
+          "targetPercent": 0,
+          "driftThresholdPercent": 5
+        },
+        {
+          "assetClass": "Equity",
+          "targetPercent": 0,
+          "driftThresholdPercent": 5
+        },
+        {
+          "assetClass": "Alternatives",
+          "targetPercent": 0,
+          "driftThresholdPercent": 5
+        },
+        {
+          "assetClass": "UNKNOWN",
+          "targetPercent": 0,
+          "driftThresholdPercent": 0
+        }
+      ]
+    }
+  ]
+}

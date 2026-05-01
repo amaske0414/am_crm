@@ -1,0 +1,26 @@
+{
+  "projectName": "AM_CRM_Codex_Starter",
+  "generatedAt": "2026-05-01",
+  "seedClientCount": 102,
+  "schemaTables": [
+    "ref_ALG",
+    "ref_ACCOUNT",
+    "ref_SECURITY",
+    "ref_PRODUCT",
+    "ref_WEALTHDESK",
+    "data_REVENUE",
+    "data_POSITIONS",
+    "data_ACTIVITY"
+  ],
+  "relationshipMappingCount": 7,
+  "keyFiles": [
+    "index.html",
+    "src/app.js",
+    "styles/styles.css",
+    "src/generated/schemaCatalog.js",
+    "src/generated/seedClients.js",
+    "docs/CODEX_INITIAL_PROMPT.md",
+    "docs/APP_SPEC.md",
+    "docs/DATA_SCHEMA_SUMMARY.md"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "appVersion": "0.1.0-codex-starter",
+  "lastRefreshAt": null,
+  "settings": {
+    "popupMode": "floating",
+    "cornerRadiusPx": 0,
+    "showTooltips": true,
+    "includeHeldAwayCash": true,
+    "autoBackups": false,
+    "showFieldSource": false
+  },
+  "tableLayout": {},
+  "dataManagement": {},
+  "clientOverrides": {},
+  "manualClients": [],
+  "notes": [],
+  "tasks": [],
+  "activityLog": [],
+  "emailTemplates": [],
+  "iconOverrides": {},
+  "snapshots": {
+    "mainGridRows": [],
+    "popupSummaries": {}
+  }
+}

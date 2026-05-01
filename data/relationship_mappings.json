@@ -1,0 +1,99 @@
+{
+  "title": "Relationship Mapping Instructions",
+  "purpose": "Defines the approved join logic for linking the workbook's reference and data tables. Use these rows as the technical relationship map when building queries, Power Query steps, BI models, or validation rules.",
+  "accountKeyStandard": "Canonical account key format is ###-######. For account-number fields that may include suffixes or extra characters, compare LEFT([Account Number], 10). For branch/office + account fields, build the key by zero-padding branch/office to 3 digits with a trailing dash and zero-padding account number to 6 digits.",
+  "matchHandling": "Treat join keys as text, preserve leading zeroes, and trim imported flat-file values before comparison. Default to LEFT JOIN from the fact/detail table to the lookup/reference table when enriching data; use INNER JOIN only when unmatched records should be excluded.",
+  "relationships": [
+    {
+      "relationshipId": "R001",
+      "lookupParentTable": "ref_PRODUCT",
+      "lookupKeyColumnOrExpression": "ref_PRODUCT.[Cde Prd]",
+      "detailRelatedTable": "data_REVENUE",
+      "detailKeyColumnOrExpression": "data_REVENUE.[Cde Prd]",
+      "canonicalJoinPredicate": "ref_PRODUCT.[Cde Prd] = data_REVENUE.[Cde Prd]",
+      "recommendedJoinUsage": "Use data_REVENUE LEFT JOIN ref_PRODUCT when enriching revenue records with product attributes.",
+      "expectedCardinality": "ref_PRODUCT 1 : many data_REVENUE",
+      "keyNormalizationRule": "Compare product code as text. Preserve the exact code value; trim whitespace if loaded from flat files.",
+      "validationChecks": "Confirm ref_PRODUCT.[Cde Prd] is unique. Check for non-null data_REVENUE.[Cde Prd] values with no matching ref_PRODUCT row.",
+      "implementationNotes": "Product reference supplies product hierarchy/classification for each revenue record."
+    },
+    {
+      "relationshipId": "R002",
+      "lookupParentTable": "ref_ACCOUNT",
+      "lookupKeyColumnOrExpression": "LEFT(ref_ACCOUNT.[Account Number], 10)",
+      "detailRelatedTable": "data_REVENUE",
+      "detailKeyColumnOrExpression": "TEXT(data_REVENUE.[Num Alt Ofc], \"000-\") & TEXT(data_REVENUE.[Num Acc], \"000000\")",
+      "canonicalJoinPredicate": "LEFT(ref_ACCOUNT.[Account Number], 10) = TEXT(data_REVENUE.[Num Alt Ofc], \"000-\") & TEXT(data_REVENUE.[Num Acc], \"000000\")",
+      "recommendedJoinUsage": "Use data_REVENUE LEFT JOIN ref_ACCOUNT when enriching revenue records with account attributes.",
+      "expectedCardinality": "ref_ACCOUNT 1 : many data_REVENUE",
+      "keyNormalizationRule": "Build the revenue-side account key as ###-######. Zero-pad Num Alt Ofc to 3 digits plus dash and Num Acc to 6 digits. Compare to the first 10 characters of ref_ACCOUNT.[Account Number].",
+      "validationChecks": "Check for blank Num Alt Ofc or Num Acc values, duplicate LEFT(ref_ACCOUNT.[Account Number], 10) keys, and revenue records with no account match.",
+      "implementationNotes": "Do not join to the full ref_ACCOUNT.[Account Number] if it contains suffixes or characters beyond the first 10-character account key."
+    },
+    {
+      "relationshipId": "R003",
+      "lookupParentTable": "ref_ACCOUNT",
+      "lookupKeyColumnOrExpression": "LEFT(ref_ACCOUNT.[Account Number], 10)",
+      "detailRelatedTable": "data_POSITIONS",
+      "detailKeyColumnOrExpression": "TEXT(data_POSITIONS.[Branch Number], \"000-\") & TEXT(data_POSITIONS.[Account Number], \"000000\")",
+      "canonicalJoinPredicate": "LEFT(ref_ACCOUNT.[Account Number], 10) = TEXT(data_POSITIONS.[Branch Number], \"000-\") & TEXT(data_POSITIONS.[Account Number], \"000000\")",
+      "recommendedJoinUsage": "Use data_POSITIONS LEFT JOIN ref_ACCOUNT when enriching position records with account attributes.",
+      "expectedCardinality": "ref_ACCOUNT 1 : many data_POSITIONS",
+      "keyNormalizationRule": "Build the positions-side account key as ###-######. Zero-pad Branch Number to 3 digits plus dash and Account Number to 6 digits. Compare to the first 10 characters of ref_ACCOUNT.[Account Number].",
+      "validationChecks": "Check for blank Branch Number or Account Number values, duplicate LEFT(ref_ACCOUNT.[Account Number], 10) keys, and positions with no account match.",
+      "implementationNotes": "Positions can contain multiple rows per account because holdings may vary by security and reporting date."
+    },
+    {
+      "relationshipId": "R004",
+      "lookupParentTable": "ref_WEALTHDESK",
+      "lookupKeyColumnOrExpression": "LEFT(ref_WEALTHDESK.[Account Number], 10)",
+      "detailRelatedTable": "data_POSITIONS",
+      "detailKeyColumnOrExpression": "TEXT(data_POSITIONS.[Branch Number], \"000-\") & TEXT(data_POSITIONS.[Account Number], \"000000\")",
+      "canonicalJoinPredicate": "LEFT(ref_WEALTHDESK.[Account Number], 10) = TEXT(data_POSITIONS.[Branch Number], \"000-\") & TEXT(data_POSITIONS.[Account Number], \"000000\")",
+      "recommendedJoinUsage": "Use data_POSITIONS LEFT JOIN ref_WEALTHDESK when enriching positions with WealthDesk account/program attributes. Aggregate positions first if the output must stay one row per WealthDesk account.",
+      "expectedCardinality": "ref_WEALTHDESK 1 : many data_POSITIONS",
+      "keyNormalizationRule": "Use the first 10 characters of ref_WEALTHDESK.[Account Number] as the WealthDesk account key. Build the positions-side key as ###-###### from Branch Number and Account Number.",
+      "validationChecks": "Check that LEFT(ref_WEALTHDESK.[Account Number], 10) is unique. Check for position accounts that do not match a WealthDesk account.",
+      "implementationNotes": "Use ref_WEALTHDESK as the workbook table name for this relationship."
+    },
+    {
+      "relationshipId": "R005",
+      "lookupParentTable": "ref_ACCOUNT",
+      "lookupKeyColumnOrExpression": "LEFT(ref_ACCOUNT.[Account Number], 10)",
+      "detailRelatedTable": "data_ACTIVITY",
+      "detailKeyColumnOrExpression": "LEFT(data_ACTIVITY.[Account Number], 10)",
+      "canonicalJoinPredicate": "LEFT(ref_ACCOUNT.[Account Number], 10) = LEFT(data_ACTIVITY.[Account Number], 10)",
+      "recommendedJoinUsage": "Use data_ACTIVITY LEFT JOIN ref_ACCOUNT when enriching activity records with account attributes.",
+      "expectedCardinality": "ref_ACCOUNT 1 : many data_ACTIVITY",
+      "keyNormalizationRule": "Compare the first 10 characters of both account-number fields as the canonical account key. Treat both values as text and trim before applying LEFT.",
+      "validationChecks": "Check duplicate LEFT(ref_ACCOUNT.[Account Number], 10) keys and activity rows with blank or unmatched account keys.",
+      "implementationNotes": "This relationship assumes the activity account number begins with the same 10-character ###-###### account key."
+    },
+    {
+      "relationshipId": "R006",
+      "lookupParentTable": "ref_SECURITY",
+      "lookupKeyColumnOrExpression": "ref_SECURITY.[ID_MSDW_SECURITY]",
+      "detailRelatedTable": "data_POSITIONS",
+      "detailKeyColumnOrExpression": "data_POSITIONS.[Cde Msdw Sec]",
+      "canonicalJoinPredicate": "ref_SECURITY.[ID_MSDW_SECURITY] = data_POSITIONS.[Cde Msdw Sec]",
+      "recommendedJoinUsage": "Use data_POSITIONS LEFT JOIN ref_SECURITY when enriching positions with security attributes.",
+      "expectedCardinality": "ref_SECURITY 1 : many data_POSITIONS",
+      "keyNormalizationRule": "Compare security identifiers as text. Preserve leading zeroes or special characters if present.",
+      "validationChecks": "Confirm ref_SECURITY.[ID_MSDW_SECURITY] is unique. Check for non-null data_POSITIONS.[Cde Msdw Sec] values with no matching security row.",
+      "implementationNotes": "Security reference supplies CUSIP, preferred issuer name, strategy, and security classification flags."
+    },
+    {
+      "relationshipId": "R007",
+      "lookupParentTable": "ref_ALG",
+      "lookupKeyColumnOrExpression": "UPPER(ref_ALG.[ID_NAME_ALG])",
+      "detailRelatedTable": "ref_ACCOUNT",
+      "detailKeyColumnOrExpression": "UPPER(ref_ACCOUNT.[Sort Name])",
+      "canonicalJoinPredicate": "UPPER(ref_ACCOUNT.[Sort Name]) = UPPER(ref_ALG.[ID_NAME_ALG])",
+      "recommendedJoinUsage": "Use ref_ACCOUNT LEFT JOIN ref_ALG when enriching account records with ALG links/status. Match names case-insensitively.",
+      "expectedCardinality": "ref_ALG 1 : many ref_ACCOUNT, based on unique ref_ALG.[ID_NAME_ALG]",
+      "keyNormalizationRule": "Normalize both name fields to UPPER(TRIM(value)) for implementation. Use exact text comparison after normalization.",
+      "validationChecks": "Check duplicate normalized ref_ALG.[ID_NAME_ALG] values, duplicate or ambiguous normalized ref_ACCOUNT.[Sort Name] values, and unmatched account names.",
+      "implementationNotes": "Name-based joins are less stable than ID/account-number joins; review ambiguous or missing matches manually."
+    }
+  ]
+}
