@@ -76,6 +76,15 @@
   // IndexedDB key for the primary source workbook folder handle.
   const SOURCE_FOLDER_HANDLE_KEY = "sourceWorkbookFolder";
 
+  // Default one-based worksheet row that contains column headers when a workbook has no specific override.
+  const DEFAULT_WORKBOOK_HEADER_ROW = 1;
+
+  // One-based worksheet header rows for known workbooks that include title/filter rows before the real table.
+  const DEFAULT_WORKBOOK_HEADER_ROW_OVERRIDES = {
+    "ref_account.xlsx": 6,
+    "data_activity.xlsx": 6
+  };
+
   // Required and optional workbook files that the local import engine understands.
   const EXPECTED_WORKBOOKS = [
     { fileName: "ref_ALG.xlsx", tableName: "ref_ALG", required: true },
@@ -396,7 +405,7 @@
       },
       dataManagement: {
         sourceFolderName: null,
-        expectedFiles: EXPECTED_WORKBOOKS.map(item => ({ ...item })),
+        expectedFiles: normalizeExpectedFiles(),
         joins: defaultRelationshipMappings(),
         userJoinCounter: 1
       },
@@ -426,6 +435,61 @@
     return rels.map(rel => ({ ...rel, approved: true, enabled: true }));
   }
 
+  function defaultHeaderRowForFile(fileName) {
+    return DEFAULT_WORKBOOK_HEADER_ROW_OVERRIDES[String(fileName || "").toLowerCase()] || DEFAULT_WORKBOOK_HEADER_ROW;
+  }
+
+  function tableNameFromFileName(fileName) {
+    return cleanText(fileName).replace(/\.xlsx$/i, "");
+  }
+
+  function normalizeWorkbookConfig(item, fallback = {}) {
+    const fileName = cleanText(item?.fileName || fallback.fileName || "");
+    const defaultHeaderRow = defaultHeaderRowForFile(fileName);
+    return {
+      fileName,
+      tableName: cleanText(item?.tableName || fallback.tableName || tableNameFromFileName(fileName)),
+      required: Boolean(item?.required ?? fallback.required ?? false),
+      headerRow: Math.round(clampNumber(item?.headerRow ?? fallback.headerRow ?? defaultHeaderRow, 1, 500, defaultHeaderRow)),
+      builtIn: Boolean(item?.builtIn ?? fallback.builtIn ?? false)
+    };
+  }
+
+  function normalizeExpectedFiles(files = []) {
+    const saved = Array.isArray(files) ? files : [];
+    const byFileName = new Map(saved.map(item => [cleanText(item.fileName).toLowerCase(), item]));
+    const usedFileNames = new Set();
+    const builtIns = EXPECTED_WORKBOOKS.map(expected => {
+      const defaultItem = normalizeWorkbookConfig({
+        ...expected,
+        headerRow: defaultHeaderRowForFile(expected.fileName),
+        builtIn: true
+      });
+      const savedItem = byFileName.get(expected.fileName.toLowerCase());
+      usedFileNames.add(expected.fileName.toLowerCase());
+      return normalizeWorkbookConfig({
+        ...defaultItem,
+        ...(savedItem || {}),
+        fileName: expected.fileName,
+        tableName: expected.tableName,
+        builtIn: true
+      }, defaultItem);
+    });
+    const custom = saved
+      .filter(item => {
+        const fileKey = cleanText(item.fileName).toLowerCase();
+        return fileKey && !usedFileNames.has(fileKey);
+      })
+      .map(item => normalizeWorkbookConfig(item, { required: false, builtIn: false }))
+      .filter(item => item.fileName && item.tableName);
+    return [...builtIns, ...custom];
+  }
+
+  function ensureExpectedFileConfig() {
+    appState.dataManagement.expectedFiles = normalizeExpectedFiles(appState.dataManagement.expectedFiles);
+    return appState.dataManagement.expectedFiles;
+  }
+
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
   }
@@ -452,6 +516,7 @@
     }
     if (!merged.emailTemplates.length) merged.emailTemplates = clone(DEFAULT_EMAIL_TEMPLATES);
     if (!merged.dataManagement.joins?.length) merged.dataManagement.joins = defaultRelationshipMappings();
+    merged.dataManagement.expectedFiles = normalizeExpectedFiles(merged.dataManagement.expectedFiles);
     merged.appVersion = APP_VERSION;
     return merged;
   }
@@ -1519,9 +1584,10 @@
   }
 
   async function importSelectedFiles(fileList, sourceMode) {
+    const expectedFiles = ensureExpectedFileConfig();
     if (!window.XLSX) {
       runtime.warnings = ["SheetJS is missing. Place xlsx.full.min.js at lib/xlsx.full.min.js and reopen index.html."];
-      runtime.fileStatuses = EXPECTED_WORKBOOKS.map(item => ({ ...item, status: "xlsx-library-missing", message: "SheetJS missing" }));
+      runtime.fileStatuses = expectedFiles.map(item => ({ ...item, status: "xlsx-library-missing", message: "SheetJS missing" }));
       render();
       return;
     }
@@ -1532,7 +1598,7 @@
     appState.priorRefreshSnapshot = clone(appState.snapshots);
     appState.dataManagement.sourceFolderName = inferFolderName(files);
 
-    for (const expected of EXPECTED_WORKBOOKS) {
+    for (const expected of expectedFiles) {
       const file = byLowerName.get(expected.fileName.toLowerCase());
       if (!file) {
         nextRuntime.fileStatuses.push({
@@ -1544,12 +1610,6 @@
         continue;
       }
       await readWorkbookIntoRuntime(file, expected, nextRuntime);
-    }
-
-    for (const file of files) {
-      if (EXPECTED_WORKBOOKS.some(expected => expected.fileName.toLowerCase() === file.name.toLowerCase())) continue;
-      const tableName = file.name.replace(/\.xlsx$/i, "");
-      await readWorkbookIntoRuntime(file, { fileName: file.name, tableName, required: false }, nextRuntime);
     }
 
     runtime = nextRuntime;
@@ -1667,19 +1727,20 @@
   }
 
   async function readWorkbookIntoRuntime(file, expected, targetRuntime) {
+    const workbookConfig = normalizeWorkbookConfig(expected);
     try {
       const workbook = window.XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-      const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+      const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false, range: workbookConfig.headerRow - 1 });
       const normalizedRows = rows.map(normalizeImportedRow);
-      const headers = Object.keys(normalizedRows[0] || {});
-      targetRuntime.importedTables[expected.tableName] = normalizedRows;
-      targetRuntime.importedHeaders[expected.tableName] = headers;
-      const headerValidation = validateHeaders(expected.tableName, headers);
+      const headers = Object.keys(normalizedRows[0] || {}).length ? Object.keys(normalizedRows[0] || {}) : worksheetHeaderFields(sheet, workbookConfig.headerRow);
+      targetRuntime.importedTables[workbookConfig.tableName] = normalizedRows;
+      targetRuntime.importedHeaders[workbookConfig.tableName] = headers;
+      const headerValidation = validateHeaders(workbookConfig.tableName, headers);
       const stale = isFileStale(file);
       targetRuntime.fileStatuses.push({
-        ...expected,
+        ...workbookConfig,
         status: headerValidation.status === "ok" && !stale ? "loaded" : stale ? "stale" : "changed-columns",
         rowCount: normalizedRows.length,
         sheetName,
@@ -1689,8 +1750,13 @@
         message: stale ? `Workbook last modified more than ${FILE_STALE_DAYS} days ago` : headerValidation.message
       });
     } catch (err) {
-      targetRuntime.fileStatuses.push({ ...expected, status: "error", rowCount: 0, message: err.message });
+      targetRuntime.fileStatuses.push({ ...workbookConfig, status: "error", rowCount: 0, message: err.message });
     }
+  }
+
+  function worksheetHeaderFields(sheet, headerRow) {
+    const previewRows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false, range: headerRow - 1, blankrows: false });
+    return (previewRows[0] || []).map(cleanText).filter(Boolean);
   }
 
   function normalizeImportedRow(row) {
@@ -2697,6 +2763,7 @@
   }
 
   function dataManagementSettings() {
+    const expectedFiles = ensureExpectedFileConfig();
     const statuses = runtime.fileStatuses.length ? runtime.fileStatuses : appState.snapshots.fileStatuses || [];
     const validation = runtime.validation.length ? runtime.validation : appState.snapshots.validation || [];
     const warnings = runtime.warnings || [];
@@ -2715,7 +2782,28 @@
         <button id="validateMappings" class="smallButton">Validate Mappings</button>
         <div class="cellMuted sectionHint">${window.XLSX ? "SheetJS loaded locally." : "SheetJS missing. Place lib/xlsx.full.min.js next to index.html."} Browser security requires one folder grant before automatic refresh can read the saved folder.</div>
         ${warnings.map(message => `<div class="miniCard cellWarn">${escapeHtml(message)}</div>`).join("")}
-        <table class="popupTable"><thead><tr><th>File</th><th>Status</th><th>Rows</th><th>Message</th></tr></thead><tbody>${statuses.map(s => `<tr><td>${escapeHtml(s.fileName)}</td><td class="${s.status === "loaded" ? "cellSuccess" : s.required ? "cellDanger" : "cellWarn"}">${escapeHtml(s.status)}</td><td>${escapeHtml(s.rowCount ?? "")}</td><td>${escapeHtml(s.message || "")}</td></tr>`).join("")}</tbody></table>
+        <table class="popupTable"><thead><tr><th>File</th><th>Header Row</th><th>Status</th><th>Rows</th><th>Message</th></tr></thead><tbody>${statuses.map(s => `<tr><td>${escapeHtml(s.fileName)}</td><td>${escapeHtml(s.headerRow || DEFAULT_WORKBOOK_HEADER_ROW)}</td><td class="${s.status === "loaded" ? "cellSuccess" : s.required ? "cellDanger" : "cellWarn"}">${escapeHtml(s.status)}</td><td>${escapeHtml(s.rowCount ?? "")}</td><td>${escapeHtml(s.message || "")}</td></tr>`).join("")}</tbody></table>
+      </div>
+      <div class="settingsCard">
+        <div class="sectionTitle">Configured Workbook Tables</div>
+        <table class="popupTable workbookConfigTable">
+          <thead><tr><th>File</th><th>Table Name</th><th>Header Row</th><th>Required</th><th></th></tr></thead>
+          <tbody>${expectedFiles.map((item, idx) => `<tr>
+            <td><input data-workbook-index="${idx}" data-workbook-field="fileName" value="${escapeHtml(item.fileName)}" ${item.builtIn ? "disabled" : ""}></td>
+            <td><input data-workbook-index="${idx}" data-workbook-field="tableName" value="${escapeHtml(item.tableName)}" ${item.builtIn ? "disabled" : ""}></td>
+            <td><input data-workbook-index="${idx}" data-workbook-field="headerRow" type="number" min="1" max="500" value="${Number(item.headerRow || DEFAULT_WORKBOOK_HEADER_ROW)}"></td>
+            <td><input data-workbook-index="${idx}" data-workbook-field="required" type="checkbox" ${item.required ? "checked" : ""}></td>
+            <td>${item.builtIn ? `<span class="cellMuted">Built in</span>` : `<button class="smallButton deleteWorkbookConfig" data-workbook-index="${idx}">Remove</button>`}</td>
+          </tr>`).join("")}</tbody>
+        </table>
+        <div class="sectionTitle">Add Table</div>
+        <div class="inlineRow workbookAddRow">
+          <input id="newWorkbookFileName" placeholder="data_EXTRA.xlsx">
+          <input id="newWorkbookTableName" placeholder="data_EXTRA">
+          <input id="newWorkbookHeaderRow" type="number" min="1" max="500" value="${DEFAULT_WORKBOOK_HEADER_ROW}" title="Header row">
+          <label class="checkRow"><input id="newWorkbookRequired" type="checkbox"> Required</label>
+          <button id="addWorkbookConfig" class="smallButton">Add</button>
+        </div>
       </div>
       <div class="settingsCard">
         <div class="sectionTitle">Visual Relationships</div>
@@ -2965,6 +3053,56 @@
       runtime.validation = validateRelationships();
       appState.snapshots.validation = clone(runtime.validation);
       saveState({ type: "validation_run", summary: "Validated data mappings" });
+      renderSettings();
+    });
+
+    document.querySelectorAll("[data-workbook-field]").forEach(input => input.addEventListener("change", () => {
+      const configs = ensureExpectedFileConfig();
+      const item = configs[Number(input.dataset.workbookIndex)];
+      if (!item) return;
+      const field = input.dataset.workbookField;
+      if (field === "required") {
+        item.required = input.checked;
+      } else if (field === "headerRow") {
+        item.headerRow = Math.round(clampNumber(input.value, 1, 500, defaultHeaderRowForFile(item.fileName)));
+      } else {
+        item[field] = input.value.trim();
+      }
+      if (field === "fileName" && !item.tableName) item.tableName = tableNameFromFileName(item.fileName);
+      appState.dataManagement.expectedFiles = normalizeExpectedFiles(configs);
+      saveState({ type: "workbook_config_edit", summary: `Changed ${item.fileName || "workbook"} ${field}` });
+      renderSettings();
+    }));
+
+    document.querySelectorAll(".deleteWorkbookConfig").forEach(button => button.addEventListener("click", () => {
+      const configs = ensureExpectedFileConfig();
+      const item = configs[Number(button.dataset.workbookIndex)];
+      if (!item || item.builtIn) return;
+      appState.dataManagement.expectedFiles = configs.filter(config => config !== item);
+      saveState({ type: "workbook_config_delete", summary: `Removed workbook table ${item.tableName}` });
+      renderSettings();
+    }));
+
+    document.getElementById("addWorkbookConfig")?.addEventListener("click", () => {
+      let fileName = document.getElementById("newWorkbookFileName").value.trim();
+      if (!fileName) return;
+      if (!/\.xlsx$/i.test(fileName)) fileName = `${fileName}.xlsx`;
+      const tableName = document.getElementById("newWorkbookTableName").value.trim() || tableNameFromFileName(fileName);
+      const configs = ensureExpectedFileConfig();
+      const duplicate = configs.some(item => item.fileName.toLowerCase() === fileName.toLowerCase() || item.tableName.toLowerCase() === tableName.toLowerCase());
+      if (duplicate) {
+        alert("That file or table name is already configured.");
+        return;
+      }
+      configs.push(normalizeWorkbookConfig({
+        fileName,
+        tableName,
+        headerRow: document.getElementById("newWorkbookHeaderRow").value,
+        required: document.getElementById("newWorkbookRequired").checked,
+        builtIn: false
+      }));
+      appState.dataManagement.expectedFiles = normalizeExpectedFiles(configs);
+      saveState({ type: "workbook_config_add", summary: `Added workbook table ${tableName}` });
       renderSettings();
     });
 
