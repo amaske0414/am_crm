@@ -13,6 +13,18 @@
   // Number of days after a workbook's last modified timestamp before Settings flags it as stale.
   const FILE_STALE_DAYS = 14;
 
+  // Maximum number of column names shown in one validation message before the remaining count is summarized.
+  const HEADER_VALIDATION_LIST_LIMIT = 12;
+
+  // Maximum number of out-of-order column positions shown in one validation message before the remaining count is summarized.
+  const HEADER_VALIDATION_ORDER_LIMIT = 8;
+
+  // Maximum number of positional header mismatches shown in one validation message before the remaining count is summarized.
+  const HEADER_VALIDATION_MISMATCH_LIMIT = 12;
+
+  // data_POSITIONS columns checked for exact Cash Keyword matches when identifying available-cash securities.
+  const CASH_KEYWORD_POSITION_FIELDS = ["Nme Sym", "Num Cusip", "Cde Msdw Sec", "Txt Lvl1 Ast Desc"];
+
   // Warning shown when the sidebar refresh button is clicked before any source folder has been granted.
   const SOURCE_FOLDER_NOT_GRANTED_WARNING = "No source folder has been granted yet. Use Settings > Data Management > Grant Folder Access once.";
 
@@ -49,7 +61,7 @@
   // Default maximum number of characters saved from each Outlook email body preview.
   const DEFAULT_OUTLOOK_BODY_PREVIEW_CHARS = 750;
 
-  // Default downloaded JSON filename for the client email list passed into the Outlook VBA helper.
+  // Default downloaded JSON filename for the client email list passed into the Excel-hosted Outlook helper.
   const DEFAULT_OUTLOOK_CLIENT_EXPORT_FILENAME = "AM_CRM_Outlook_Client_Emails.json";
 
   // Default imported JSON filename expected from the helper recent-email export.
@@ -61,11 +73,28 @@
   // Default imported JSON filename expected from the helper email-to-task export.
   const DEFAULT_OUTLOOK_TASK_CANDIDATE_FILENAME = "AM_CRM_Outlook_Task_Candidates.json";
 
-  // Default prefix used when this app downloads a draft JSON file for the Outlook VBA helper.
+  // Default prefix used when this app downloads a draft JSON file for the Excel-hosted Outlook helper.
   const DEFAULT_OUTLOOK_DRAFT_FILE_PREFIX = "AM_CRM_Outlook_Draft";
 
   // Default contact type label used when imported sent emails are counted as actual client contact.
   const DEFAULT_OUTLOOK_SENT_CONTACT_TYPE = "Sent email";
+
+  // Step-by-step Excel-hosted Outlook helper setup instructions shown in Settings.
+  const VBA_OUTLOOK_HELPER_SETUP_STEPS = [
+    "Do not use Outlook's Visual Basic editor. This helper is installed and run from Excel only.",
+    "Click Export Client Email JSON in this tab and save the file in the same folder used for AM_CRM source data or another easy-to-find folder.",
+    "Open Excel and create a blank workbook.",
+    "Press Alt+F11 in Excel to open the Visual Basic editor.",
+    "In Excel's Visual Basic editor, click File > Import File.",
+    "Choose vba/AM_CRM_Outlook_Helper.bas from this app folder.",
+    "Save the workbook as an Excel Macro-Enabled Workbook (*.xlsm), for example AM_CRM_Outlook_Helper.xlsm.",
+    "Enable macros for the workbook if Excel prompts you.",
+    "Keep Outlook Desktop open and signed in, then return to Excel.",
+    "In Excel, press Alt+F8, choose AMCRM_Excel_RunAllExports, and click Run.",
+    "When prompted, select the AM_CRM_Outlook_Client_Emails.json file and choose the output folder for the generated JSON files.",
+    "Use the same output folder that AM_CRM can read. LLM Export JSON auto-imports AM_CRM_Outlook_Recent_Emails.json and AM_CRM_Outlook_Sent_Email_Log.json from the saved folder when those files exist.",
+    "If needed, run AMCRM_Excel_ExportRecentEmails, AMCRM_Excel_ExportSentEmailLog, AMCRM_Excel_ExportTaskCandidates, or AMCRM_Excel_OpenDraftFromJson individually from Excel's Macro dialog."
+  ];
 
   // IndexedDB database name used only to remember the browser-granted source folder handle.
   const FOLDER_HANDLE_DB_NAME = "AM_CRM_FOLDER_HANDLES";
@@ -127,6 +156,7 @@
     sidebar_export: "&#8681;",
     sidebar_add_task: "&#9745;",
     sidebar_add_note: "&#9998;",
+    sidebar_tasks: "&#9776;",
     grid_email: "",
     grid_notes: ""
   };
@@ -139,6 +169,7 @@
     "sidebar_export",
     "sidebar_add_task",
     "sidebar_add_note",
+    "sidebar_tasks",
     "sidebar_home"
   ];
 
@@ -150,7 +181,8 @@
     sidebar_backup: "btnBackup",
     sidebar_export: "btnExport",
     sidebar_add_task: "btnAddTask",
-    sidebar_add_note: "btnAddNote"
+    sidebar_add_note: "btnAddNote",
+    sidebar_tasks: "btnTasksNav"
   };
 
   // Icon override labels shown in Settings > Icons.
@@ -162,9 +194,45 @@
     { key: "sidebar_export", label: "Sidebar Export Grid" },
     { key: "sidebar_add_task", label: "Sidebar Add Task" },
     { key: "sidebar_add_note", label: "Sidebar Add Note" },
+    { key: "sidebar_tasks", label: "Sidebar Tasks View" },
     { key: "grid_email", label: "Main Table Email" },
     { key: "grid_notes", label: "Main Table Notes" }
   ];
+
+  // Button tooltip text applied after dynamic renders when a button does not already define a title.
+  const BUTTON_TOOLTIPS_BY_ID = {
+    btnSettingsNav: "Open the Settings view.",
+    btnHomeNav: "Open the main client table view.",
+    btnTasksNav: "Open the all-client open tasks table.",
+    btnRefresh: "Refresh app data from the saved source workbook folder.",
+    btnBackup: "Download a full JSON backup of the current app state.",
+    btnExport: "Export the visible main grid to Excel or CSV.",
+    btnAddTask: "Open the Tasks popup for the first visible client so a task can be added.",
+    btnAddNote: "Open the Notes popup for the first visible client so a note can be added.",
+    grantSourceFolder: "Grant the browser read access to the folder containing source workbooks and helper JSON files.",
+    refreshSavedFolder: "Refresh app data from the currently saved source folder.",
+    importFolder: "Choose a folder of workbook files to import.",
+    importFiles: "Choose one or more workbook files to import.",
+    validateMappings: "Run validation checks for configured table relationships and imported files.",
+    exportLlmJson: "Import available Outlook helper JSON files, refresh saved workbook data, rebuild the LLM export, and copy the prompt plus JSON to the clipboard.",
+    importLlmJson: "Open a paste box for importing an LLM task JSON response.",
+    submitLlmImport: "Parse the pasted LLM JSON and add tasks to the matching clients.",
+    addTaskForClient: "Add the task entered in this popup to the current client.",
+    addFamilyMember: "Add the typed family or relationship entry to this client profile.",
+    saveContactLog: "Save this interaction as client contact activity.",
+    openEmailDraft: "Open a mailto draft with the displayed subject and body.",
+    downloadOutlookDraft: "Download this email draft as JSON for the Excel-hosted Outlook helper.",
+    addNote: "Add the typed note to this client and column.",
+    resetLayout: "Reset main table column widths to the app defaults.",
+    addWorkbookConfig: "Add the typed workbook configuration to the Data Management import list.",
+    addRelationship: "Add the typed table relationship mapping to Data Management.",
+    addTemplate: "Add a new editable email template.",
+    backupNow: "Download a full JSON backup of the current app state.",
+    restoreBackup: "Select a JSON backup file and restore app state from it.",
+    exportGrid: "Export the visible main grid to Excel or CSV.",
+    addTaskPriorityRule: "Add a new rule used to calculate task priority scores.",
+    resetTaskPriorityRules: "Reset all task priority rules to the default set."
+  };
 
   // Settings submenu order for the only non-Home app view.
   const SETTINGS_SECTIONS = [
@@ -173,7 +241,7 @@
     "Status",
     "Client Profile",
     "Email",
-    "VBA Outlook Helper",
+    "Excel Outlook Helper",
     "Next Contact",
     "T12 Revenue",
     "NNA",
@@ -255,6 +323,87 @@
   // Task priorities managed entirely inside this app.
   const DEFAULT_TASK_PRIORITIES = ["Low", "Normal", "High", "Urgent"];
 
+  // Task categories used by LLM imports, manual task creation, and prioritization rules.
+  const TASK_CATEGORY_OPTIONS = ["Trades/Orders", "Client Follow Up", "Review Meeting Next Steps", "Planning", "Cash Review", "Allocation Review", "Online Activity", "Administrative", "Other"];
+
+  // Client status tie-breaker points used when a task priority rule enables service-tier scoring.
+  const TASK_STATUS_TIE_BREAKER_POINTS = { A: 40, B: 25, C: 10, D: 0 };
+
+  // Default rules that calculate task priority scores on the all-client Tasks view.
+  const DEFAULT_TASK_PRIORITY_RULES = [
+    { id: "rule_trades_orders", enabled: true, name: "Trades / orders first", category: "Trades/Orders", sourceColumn: "", keyword: "", clientStatus: "", priority: "", baseScore: 10000, agePointsPerDay: 1, maxAgePoints: 50, dueWithinDays: 3, dueSoonPoints: 150, overduePoints: 300, useClientStatusTieBreaker: false },
+    { id: "rule_client_follow_up", enabled: true, name: "Client follow-up second", category: "Client Follow Up", sourceColumn: "", keyword: "", clientStatus: "", priority: "", baseScore: 9000, agePointsPerDay: 2, maxAgePoints: 250, dueWithinDays: 5, dueSoonPoints: 120, overduePoints: 260, useClientStatusTieBreaker: true },
+    { id: "rule_review_next_steps", enabled: true, name: "Review meeting next steps third", category: "Review Meeting Next Steps", sourceColumn: "", keyword: "", clientStatus: "", priority: "", baseScore: 8000, agePointsPerDay: 1, maxAgePoints: 150, dueWithinDays: 7, dueSoonPoints: 100, overduePoints: 220, useClientStatusTieBreaker: true },
+    { id: "rule_cash_review", enabled: true, name: "Cash review", category: "Cash Review", sourceColumn: "", keyword: "", clientStatus: "", priority: "", baseScore: 6500, agePointsPerDay: 1, maxAgePoints: 100, dueWithinDays: 7, dueSoonPoints: 80, overduePoints: 160, useClientStatusTieBreaker: true },
+    { id: "rule_allocation_review", enabled: true, name: "Allocation review", category: "Allocation Review", sourceColumn: "", keyword: "", clientStatus: "", priority: "", baseScore: 6000, agePointsPerDay: 1, maxAgePoints: 100, dueWithinDays: 10, dueSoonPoints: 70, overduePoints: 140, useClientStatusTieBreaker: true },
+    { id: "rule_manual_urgent", enabled: true, name: "Manual urgent boost", category: "", sourceColumn: "", keyword: "", clientStatus: "", priority: "Urgent", baseScore: 700, agePointsPerDay: 0, maxAgePoints: 0, dueWithinDays: 2, dueSoonPoints: 100, overduePoints: 200, useClientStatusTieBreaker: false },
+    { id: "rule_manual_high", enabled: true, name: "Manual high boost", category: "", sourceColumn: "", keyword: "", clientStatus: "", priority: "High", baseScore: 400, agePointsPerDay: 0, maxAgePoints: 0, dueWithinDays: 3, dueSoonPoints: 60, overduePoints: 120, useClientStatusTieBreaker: false }
+  ];
+
+  // Default instruction text prepended to the copied LLM export JSON.
+  const DEFAULT_LLM_PREPEND_PROMPT = `You are analyzing AM_CRM app data for one financial advisory practice. Generate actionable tasks from the JSON data that follows this prompt.
+
+Return only a valid JSON text string. Do not use markdown, code fences, comments, or explanatory text outside the JSON.
+
+Use this exact response shape:
+{
+  "exportType": "AM_CRM_LLM_TASK_IMPORT",
+  "source": "llm_task_generator",
+  "generatedAt": "YYYY-MM-DDTHH:mm:ssZ",
+  "tasks": [
+    {
+      "clientGroupId": "must exactly match a clientGroupId from the input",
+      "title": "short action-oriented task title",
+      "dueDate": "YYYY-MM-DD or null",
+      "priority": "Urgent, High, Normal, or Low",
+      "status": "Open",
+      "sourceColumn": "main table column that caused the task, such as Next Contact, Available Cash, Asset Allocation, Financial Plan, Online Activity, Email, or Tasks",
+      "category": "Trades/Orders, Client Follow Up, Review Meeting Next Steps, Planning, Cash Review, Allocation Review, Online Activity, Administrative, or Other",
+      "tags": ["short", "routing", "tags"],
+      "notes": "concise explanation of what should be done",
+      "reasoning": "brief evidence from the provided data"
+    }
+  ]
+}
+
+Task rules:
+- Create tasks only when there is a clear action to take from the provided data.
+- Do not duplicate an existing open task for the same client if the input already contains one.
+- Use Trades/Orders for tasks involving trade entry, orders, rebalancing, buys, or sells.
+- Use Client Follow Up for overdue contacts, call/email follow-ups, or client communication needs.
+- Use Review Meeting Next Steps for tasks that come from review meeting follow-up or next-step planning.
+- Use Cash Review for cash balances outside min/max thresholds or liquidity review needs.
+- Use Allocation Review for allocation drift or concentration review needs.
+- Use Online Activity for online access or login-related follow-up.
+- Keep titles short enough to scan in a task table.
+- Use null for dueDate if no defensible due date can be inferred.`;
+
+  // Exportable LLM datapoints grouped by their associated main table column.
+  const LLM_EXPORT_DATAPOINTS = [
+    { key: "clientProfile", columnKey: "clientName", label: "Client profile and service settings", defaultOn: true },
+    { key: "emailAddresses", columnKey: "email", label: "Client email addresses", defaultOn: true },
+    { key: "recentEmails", columnKey: "email", label: "Recent Outlook email history", defaultOn: true },
+    { key: "status", columnKey: "status", label: "Displayed and calculated status", defaultOn: true },
+    { key: "nextContact", columnKey: "nextContact", label: "Last and next contact data", defaultOn: true },
+    { key: "t12Revenue", columnKey: "t12Revenue", label: "T12 revenue", defaultOn: true },
+    { key: "nna", columnKey: "nna", label: "Net new assets", defaultOn: true },
+    { key: "availableCash", columnKey: "availableCash", label: "Available cash and min/max alert", defaultOn: true },
+    { key: "totalAssets", columnKey: "totalAssets", label: "Total assets", defaultOn: true },
+    { key: "advisoryAssets", columnKey: "totalAssets", label: "Advisory assets", defaultOn: true },
+    { key: "assetAllocation", columnKey: "assetAllocation", label: "Asset allocation rows and drift", defaultOn: true },
+    { key: "financialPlan", columnKey: "financialPlan", label: "Financial plan summary", defaultOn: true },
+    { key: "onlineActivity", columnKey: "onlineActivity", label: "Online activity summary", defaultOn: true },
+    { key: "openTasks", columnKey: "tasks", label: "Existing open tasks", defaultOn: true },
+    { key: "ruleBasedActions", columnKey: "tasks", label: "Rule-based suggested actions", defaultOn: true },
+    { key: "importantNotes", columnKey: "notes", label: "Starred notes", defaultOn: true },
+    { key: "notes", columnKey: "notes", label: "All active notes", defaultOn: false },
+    { key: "recentActivityLog", columnKey: "notes", label: "Recent app activity log", defaultOn: true },
+    { key: "columnSpecificAlerts", columnKey: "notes", label: "Column-specific alerts", defaultOn: true }
+  ];
+
+  // Default LLM export field visibility keyed by datapoint id.
+  const DEFAULT_LLM_EXPORT_FIELD_VISIBILITY = LLM_EXPORT_DATAPOINTS.reduce((visibility, item) => ({ ...visibility, [item.key]: item.defaultOn !== false }), {});
+
   // Default email templates and trigger names used by the Email popup.
   const DEFAULT_EMAIL_TEMPLATES = [
     {
@@ -329,6 +478,9 @@
     outlookSentContactType: DEFAULT_OUTLOOK_SENT_CONTACT_TYPE,
     taskStatuses: DEFAULT_TASK_STATUSES,
     taskPriorities: DEFAULT_TASK_PRIORITIES,
+    taskPriorityRules: DEFAULT_TASK_PRIORITY_RULES,
+    llmPrependPrompt: DEFAULT_LLM_PREPEND_PROMPT,
+    llmExportFieldVisibility: DEFAULT_LLM_EXPORT_FIELD_VISIBILITY,
     defaultRiskProfile: "3 - Balanced Growth",
     noteShowArchived: false,
     recurrencePlaceholderEnabled: true,
@@ -377,6 +529,8 @@
   let runtime = emptyRuntime();
   let gridRows = [];
   let activeSort = { key: "t12Revenue", direction: "desc" };
+  let activeTaskSort = { key: "priorityScore", direction: "desc" };
+  let taskViewFilters = { text: "", category: "", priority: "", status: "", clientStatus: "", sourceColumn: "" };
   let activeSettingsSection = "Main Table";
   let activePopup = null;
   let autoRefreshAttempted = false;
@@ -631,6 +785,15 @@
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
   }
 
+  function formatSignedMoney(value) {
+    const n = toNumber(value);
+    if (n === null) return "N/A";
+    const formatted = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Math.abs(n));
+    if (n > 0) return `+${formatted}`;
+    if (n < 0) return `-${formatted}`;
+    return formatted;
+  }
+
   function formatPercent(value, digits = 1) {
     const n = toNumber(value);
     if (n === null) return "N/A";
@@ -682,10 +845,16 @@
     renderGrid();
     renderLastRefresh();
     if (isSettingsVisible()) renderSettings();
+    if (isTasksVisible()) renderTasksView();
+    applyButtonTooltips();
   }
 
   function isSettingsVisible() {
     return document.getElementById("settingsView")?.classList.contains("active");
+  }
+
+  function isTasksVisible() {
+    return document.getElementById("tasksView")?.classList.contains("active");
   }
 
   function snapshotVisibleState() {
@@ -736,6 +905,7 @@
       assetAllocation: row.assetAllocation,
       financialPlan: row.financialPlan,
       onlineActivity: row.onlineActivity,
+      algLinks: row.algLinks,
       tasks: row.tasks,
       notes: row.notes,
       alerts: row.alerts,
@@ -758,7 +928,9 @@
       const row = mergeStatefulCounts({ ...snapshot });
       row.nextContact = normalizeNextContact(row.nextContact, row.lastContactDate, row.contactFrequencyCode);
       row.summaries = row.summaries || {};
-      row.alerts = row.alerts || [];
+      row.availableCashAlert = cashBalanceOutsideBounds(row.availableCash, row.minAvailableCash, row.maxAvailableCash);
+      if (row.summaries.positions) row.summaries.positions.availableCashAlert = row.availableCashAlert;
+      row.alerts = buildRowAlerts(row);
       return row;
     });
   }
@@ -803,6 +975,7 @@
         assetAllocation: "N/A",
         financialPlan: "N/A",
         onlineActivity: null,
+        algLinks: algLinksFromSource(client),
         alerts: [],
         summaries: defaultSummaries()
       };
@@ -863,6 +1036,7 @@
         assetAllocation: "N/A",
         financialPlan: financial?.display ?? "N/A",
         onlineActivity: online || null,
+        algLinks: algLinksFromSource(source.alg),
         alerts: [],
         summaries: {
           accounts: accountSummary,
@@ -873,6 +1047,8 @@
           online: online || {}
         }
       };
+      row.availableCashAlert = cashBalanceOutsideBounds(row.availableCash, row.minAvailableCash, row.maxAvailableCash);
+      row.summaries.positions.availableCashAlert = row.availableCashAlert;
       row.nextContact = computeNextContact(lastContact, profile.contactFrequency);
       row.calculatedStatus = calculateStatusTier(row).tier;
       row.status = applyParentStatusOverride(row, row.calculatedStatus, row.status);
@@ -880,6 +1056,22 @@
       row.alerts = buildRowAlerts(row);
       return mergeStatefulCounts(row);
     });
+  }
+
+  function algLinksFromSource(source) {
+    return {
+      url_ALG: cleanText(source?.url_ALG),
+      url_GPS: cleanText(source?.url_GPS),
+      url_MSO: cleanText(source?.url_MSO)
+    };
+  }
+
+  function cashBalanceOutsideBounds(value, min, max) {
+    const balance = toNumber(value);
+    if (balance === null) return false;
+    const minimum = toNumber(min);
+    const maximum = toNumber(max);
+    return (minimum !== null && balance < minimum) || (maximum !== null && balance > maximum);
   }
 
   function defaultSummaries() {
@@ -1473,18 +1665,13 @@
 
   function isAvailableCashPosition(row, account, security, managed) {
     if (managed || !account || !isTaxableAccount(account) || isIraAccount(account)) return false;
-    if (isYes(security.isCASH) || isYes(security.isBDPS)) return true;
-    const haystack = normalizeTextKey([
-      row["Nme Iss Typ"],
-      row["Nme Iss Sub Typ"],
-      row["Nme Asset Typ"],
-      row["Txt Lvl1 Ast Desc"],
-      row["Txt Lvl2 Ast Desc"],
-      row["Txt Lvl3 Ast Desc"],
-      row["Pref Iss Nme"],
-      row["Nme Sym"]
-    ].join(" "));
-    return (appState.settings.cashKeywords || DEFAULT_SETTINGS.cashKeywords).some(keyword => haystack.includes(normalizeTextKey(keyword)));
+    return cashKeywordExactMatch(row);
+  }
+
+  function cashKeywordExactMatch(row) {
+    const keywordSet = new Set((appState.settings.cashKeywords || DEFAULT_SETTINGS.cashKeywords).map(normalizeTextKey).filter(Boolean));
+    if (!keywordSet.size) return false;
+    return CASH_KEYWORD_POSITION_FIELDS.some(field => keywordSet.has(normalizeTextKey(row[field])));
   }
 
   function cashTypeForPosition(row, security) {
@@ -1739,6 +1926,7 @@
       targetRuntime.importedHeaders[workbookConfig.tableName] = headers;
       const headerValidation = validateHeaders(workbookConfig.tableName, headers);
       const stale = isFileStale(file);
+      const staleMessage = `Workbook last modified more than ${FILE_STALE_DAYS} days ago`;
       targetRuntime.fileStatuses.push({
         ...workbookConfig,
         status: headerValidation.status === "ok" && !stale ? "loaded" : stale ? "stale" : "changed-columns",
@@ -1747,7 +1935,10 @@
         lastModified: file.lastModified ? new Date(file.lastModified).toISOString() : null,
         missingColumns: headerValidation.missingColumns,
         extraColumns: headerValidation.extraColumns,
-        message: stale ? `Workbook last modified more than ${FILE_STALE_DAYS} days ago` : headerValidation.message
+        mismatchedColumns: headerValidation.mismatchedColumns,
+        outOfOrderColumns: headerValidation.outOfOrderColumns,
+        duplicateColumns: headerValidation.duplicateColumns,
+        message: stale && headerValidation.status !== "ok" ? `${staleMessage} | ${headerValidation.message}` : stale ? staleMessage : headerValidation.message
       });
     } catch (err) {
       targetRuntime.fileStatuses.push({ ...workbookConfig, status: "error", rowCount: 0, message: err.message });
@@ -1770,17 +1961,60 @@
 
   function validateHeaders(tableName, headers) {
     const expectedFields = (schemaCatalog.tables?.[tableName]?.fields || []).map(field => field.fieldName);
-    if (!expectedFields.length) return { status: "ok", missingColumns: [], extraColumns: [], message: "Schema not attached; using workbook headers." };
+    if (!expectedFields.length) return { status: "ok", missingColumns: [], extraColumns: [], mismatchedColumns: [], outOfOrderColumns: [], duplicateColumns: [], message: "Schema not attached; using workbook headers." };
     const headerSet = new Set(headers);
     const expectedSet = new Set(expectedFields);
+    const headerCounts = headers.reduce((counts, header) => counts.set(header, (counts.get(header) || 0) + 1), new Map());
     const missingColumns = expectedFields.filter(field => !headerSet.has(field));
     const extraColumns = headers.filter(header => !expectedSet.has(header));
+    const mismatchedColumns = expectedFields
+      .map((field, idx) => ({ expected: field, actual: cleanText(headers[idx]), position: idx + 1 }))
+      .filter(item => item.actual && item.actual !== item.expected);
+    const duplicateColumns = [...headerCounts.entries()].filter(([, count]) => count > 1).map(([header, count]) => ({ header, count }));
+    const outOfOrderColumns = expectedFields
+      .map((field, idx) => ({ field, expectedPosition: idx + 1, actualPosition: headers.indexOf(field) + 1 }))
+      .filter(item => item.actualPosition > 0 && item.actualPosition !== item.expectedPosition);
+    const hasChanges = missingColumns.length || extraColumns.length || mismatchedColumns.length || outOfOrderColumns.length || duplicateColumns.length;
     return {
-      status: missingColumns.length ? "changed" : "ok",
+      status: hasChanges ? "changed" : "ok",
       missingColumns,
       extraColumns,
-      message: missingColumns.length ? "Expected columns missing" : "Headers match expected schema"
+      mismatchedColumns,
+      outOfOrderColumns,
+      duplicateColumns,
+      message: hasChanges ? headerValidationMessage(missingColumns, extraColumns, mismatchedColumns, outOfOrderColumns, duplicateColumns) : "Headers match expected schema"
     };
+  }
+
+  function headerValidationMessage(missingColumns, extraColumns, mismatchedColumns, outOfOrderColumns, duplicateColumns) {
+    const parts = [];
+    if (missingColumns.length) parts.push(`Missing expected columns: ${limitedList(missingColumns, HEADER_VALIDATION_LIST_LIMIT)}`);
+    if (mismatchedColumns.length) {
+      const mismatchList = mismatchedColumns
+        .slice(0, HEADER_VALIDATION_MISMATCH_LIMIT)
+        .map(item => `#${item.position} expected "${item.expected}", found "${item.actual}"`)
+        .join("; ");
+      const remaining = mismatchedColumns.length > HEADER_VALIDATION_MISMATCH_LIMIT ? `; +${mismatchedColumns.length - HEADER_VALIDATION_MISMATCH_LIMIT} more` : "";
+      parts.push(`Mismatched columns: ${mismatchList}${remaining}`);
+    }
+    if (outOfOrderColumns.length) {
+      const orderList = outOfOrderColumns
+        .slice(0, HEADER_VALIDATION_ORDER_LIMIT)
+        .map(item => `${item.field} expected #${item.expectedPosition}, found #${item.actualPosition}`)
+        .join("; ");
+      const remaining = outOfOrderColumns.length > HEADER_VALIDATION_ORDER_LIMIT ? `; +${outOfOrderColumns.length - HEADER_VALIDATION_ORDER_LIMIT} more` : "";
+      parts.push(`Out of order: ${orderList}${remaining}`);
+    }
+    if (extraColumns.length) parts.push(`Unexpected workbook columns: ${limitedList(extraColumns, HEADER_VALIDATION_LIST_LIMIT)}`);
+    if (duplicateColumns.length) {
+      parts.push(`Duplicates: ${limitedList(duplicateColumns.map(item => `${item.header} x${item.count}`), HEADER_VALIDATION_LIST_LIMIT)}`);
+    }
+    return parts.join(" | ");
+  }
+
+  function limitedList(values, limit) {
+    const visible = values.slice(0, limit).join(", ");
+    return values.length > limit ? `${visible}, +${values.length - limit} more` : visible;
   }
 
   function isFileStale(file) {
@@ -1897,7 +2131,7 @@
     let value = "";
     if (col.key === "clientName") value = `${rows.length} clients`;
     if (col.key === "t12Revenue") value = formatMoney(sumRows(rows, "t12Revenue"));
-    if (col.key === "nna") value = formatMoney(sumRows(rows, "nna"));
+    if (col.key === "nna") value = formatSignedMoney(sumRows(rows, "nna"));
     if (col.key === "totalAssets") value = formatMoney(sumRows(rows, "totalAssets"));
     if (col.key === "tasks") value = rows.reduce((sum, row) => sum + Number(row.tasks || 0), 0);
     return `<td class="${stickyClass}">${escapeHtml(value)}</td>`;
@@ -2007,9 +2241,15 @@
     else if (col.key === "nextContact") {
       html = escapeHtml(row.nextContact?.display || "N/A");
       className += ` ${row.nextContact?.className || ""}`;
-    } else if (col.key === "t12Revenue" || col.key === "nna" || col.key === "totalAssets") {
+    } else if (col.key === "t12Revenue" || col.key === "totalAssets") {
       html = formatMoney(row[col.key]);
       if (html === "N/A") className += " cellMuted";
+    } else if (col.key === "nna") {
+      html = formatSignedMoney(row.nna);
+      const nnaValue = toNumber(row.nna);
+      if (html === "N/A") className += " cellMuted";
+      else if (nnaValue > 0) className += " cellSuccess";
+      else if (nnaValue < 0) className += " cellDanger";
     } else if (col.key === "availableCash") {
       html = row.availableCash === null || row.availableCash === undefined ? "N/A" : `${formatMoney(row.availableCash, "k")} / ${formatPercent(row.availableCashPercent)}`;
       if (html === "N/A") className += " cellMuted";
@@ -2049,6 +2289,263 @@
     const override = appState.iconOverrides[key];
     if (override) return `<img class="gridIconImg" alt="${escapeHtml(title)}" src="${escapeHtml(override)}">`;
     return `<span class="${escapeHtml(fallbackClass)}" title="${escapeHtml(title)}"></span>`;
+  }
+
+  function renderTasksView() {
+    const board = document.getElementById("tasksBoard");
+    if (!board) return;
+    const tasks = sortedTaskRows(filteredTaskRows(openTaskRows()));
+    const categoryOptions = uniqueTaskValues("category");
+    const priorityOptions = uniqueTaskValues("priority");
+    const statusOptions = uniqueTaskValues("status");
+    const clientStatusOptions = uniqueTaskValues("clientStatus");
+    const sourceColumnOptions = uniqueTaskValues("sourceColumn");
+    board.innerHTML = `
+      <div class="taskBoardHeader">
+        <div>
+          <div class="sectionTitle">Open Tasks</div>
+          <div class="cellMuted">${tasks.length} open tasks shown across all clients.</div>
+        </div>
+      </div>
+      <div class="taskFilterBar">
+        <input id="taskFilterText" value="${escapeHtml(taskViewFilters.text)}" placeholder="Filter tasks, clients, notes, tags">
+        ${taskFilterSelect("taskFilterCategory", "category", "Category", categoryOptions)}
+        ${taskFilterSelect("taskFilterPriority", "priority", "Priority", priorityOptions)}
+        ${taskFilterSelect("taskFilterStatus", "status", "Status", statusOptions)}
+        ${taskFilterSelect("taskFilterClientStatus", "clientStatus", "Client Status", clientStatusOptions)}
+        ${taskFilterSelect("taskFilterSourceColumn", "sourceColumn", "Source Column", sourceColumnOptions)}
+      </div>
+      <div class="taskTableWrap">
+        <table id="tasksTable">
+          <thead><tr>
+            ${taskHeader("priorityScore", "Score")}
+            ${taskHeader("category", "Category")}
+            ${taskHeader("priority", "Priority")}
+            ${taskHeader("status", "Status")}
+            ${taskHeader("clientStatus", "Tier")}
+            ${taskHeader("clientName", "Client")}
+            ${taskHeader("sourceColumn", "Source")}
+            ${taskHeader("title", "Title")}
+            ${taskHeader("dueDate", "Due")}
+            ${taskHeader("ageDays", "Age")}
+            <th>Tags</th>
+            <th>Notes</th>
+            <th>Rule Match</th>
+            <th></th>
+          </tr></thead>
+          <tbody>${tasks.map(taskBoardRow).join("") || `<tr><td colspan="14" class="cellMuted">No open tasks match the current filters.</td></tr>`}</tbody>
+        </table>
+      </div>`;
+    wireTasksView();
+    applyButtonTooltips(board);
+  }
+
+  function taskFilterSelect(id, key, label, values) {
+    return `<select id="${escapeHtml(id)}"><option value="">${escapeHtml(label)}: All</option>${values.map(value => `<option value="${escapeHtml(value)}" ${taskViewFilters[key] === value ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select>`;
+  }
+
+  function taskHeader(key, label) {
+    const icon = activeTaskSort.key === key ? (activeTaskSort.direction === "asc" ? " ^" : " v") : "";
+    return `<th class="sortable" data-task-sort="${escapeHtml(key)}">${escapeHtml(label)}${icon}</th>`;
+  }
+
+  function taskBoardRow(task) {
+    return `<tr data-task-id="${escapeHtml(task.id)}">
+      <td>${escapeHtml(Math.round(task.priorityScore))}</td>
+      <td>${escapeHtml(task.category)}</td>
+      <td>${escapeHtml(task.priority || "Normal")}</td>
+      <td>${escapeHtml(task.status || "Open")}</td>
+      <td>${statusIcon(task.clientStatus, task.clientGroupId)} ${escapeHtml(task.clientStatus || "N/A")}</td>
+      <td>${escapeHtml(task.clientName || task.clientGroupId)}</td>
+      <td>${escapeHtml(task.sourceColumn || "Tasks")}</td>
+      <td><strong>${escapeHtml(task.title)}</strong></td>
+      <td class="${task.dueDays !== null && task.dueDays < 0 ? "cellDanger" : ""}">${escapeHtml(task.dueDate || "N/A")}</td>
+      <td>${escapeHtml(`${task.ageDays}d`)}</td>
+      <td>${escapeHtml(task.tags.join(", "))}</td>
+      <td>${escapeHtml(task.notes || "")}</td>
+      <td>${escapeHtml(task.priorityReason || "")}</td>
+      <td><button class="smallButton openTaskClient" data-task-id="${escapeHtml(task.id)}">Open</button></td>
+    </tr>`;
+  }
+
+  function wireTasksView() {
+    document.getElementById("taskFilterText")?.addEventListener("input", event => {
+      taskViewFilters.text = event.target.value;
+      renderTasksView();
+      const input = document.getElementById("taskFilterText");
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    });
+    [
+      ["taskFilterCategory", "category"],
+      ["taskFilterPriority", "priority"],
+      ["taskFilterStatus", "status"],
+      ["taskFilterClientStatus", "clientStatus"],
+      ["taskFilterSourceColumn", "sourceColumn"]
+    ].forEach(([id, key]) => {
+      document.getElementById(id)?.addEventListener("change", event => {
+        taskViewFilters[key] = event.target.value;
+        renderTasksView();
+      });
+    });
+    document.querySelectorAll("[data-task-sort]").forEach(th => th.addEventListener("click", () => {
+      const key = th.dataset.taskSort;
+      if (activeTaskSort.key === key) activeTaskSort.direction = activeTaskSort.direction === "asc" ? "desc" : "asc";
+      else activeTaskSort = { key, direction: key === "priorityScore" || key === "ageDays" ? "desc" : "asc" };
+      renderTasksView();
+    }));
+    document.querySelectorAll(".openTaskClient").forEach(button => button.addEventListener("click", event => {
+      event.stopPropagation();
+      const task = appState.tasks.find(item => item.id === button.dataset.taskId);
+      const row = task ? gridRows.find(item => item.id === task.clientGroupId) : null;
+      if (row) openPopup(row, COLUMN_DEFS.find(col => col.key === "tasks"), { target: document.querySelector("#tasksTable") || document.querySelector("#clientGrid tbody td") });
+    }));
+  }
+
+  function openTaskRows() {
+    return (appState.tasks || [])
+      .filter(task => !task.archivedDate && !["Completed", "Cancelled"].includes(task.status))
+      .map(task => enrichTaskForPriority(task));
+  }
+
+  function enrichTaskForPriority(task) {
+    const row = gridRows.find(item => item.id === task.clientGroupId) || {};
+    const category = normalizeTaskCategory(task.category || inferTaskCategory(task));
+    const sourceColumn = cleanText(task.sourceColumn || "Tasks");
+    const tags = normalizeTaskTags(task.tags);
+    const displayTags = tags.length ? tags : normalizeTaskTags(`${category}, ${sourceColumn}`);
+    const enriched = {
+      ...task,
+      category,
+      tags: displayTags,
+      sourceColumn,
+      clientName: row.clientName || task.clientGroupId,
+      clientStatus: validStatus(row.status) || row.status || "N/A",
+      ageDays: taskAgeDays(task),
+      dueDays: taskDueDays(task)
+    };
+    const priority = calculateTaskPriority(enriched, row);
+    enriched.priorityScore = priority.score;
+    enriched.priorityReason = priority.reasons.join("; ");
+    return enriched;
+  }
+
+  function filteredTaskRows(tasks) {
+    const q = normalizeTextKey(taskViewFilters.text);
+    return tasks.filter(task => {
+      if (taskViewFilters.category && task.category !== taskViewFilters.category) return false;
+      if (taskViewFilters.priority && task.priority !== taskViewFilters.priority) return false;
+      if (taskViewFilters.status && task.status !== taskViewFilters.status) return false;
+      if (taskViewFilters.clientStatus && task.clientStatus !== taskViewFilters.clientStatus) return false;
+      if (taskViewFilters.sourceColumn && task.sourceColumn !== taskViewFilters.sourceColumn) return false;
+      if (!q) return true;
+      return normalizeTextKey([
+        task.clientName,
+        task.clientGroupId,
+        task.title,
+        task.notes,
+        task.category,
+        task.sourceColumn,
+        task.tags.join(" ")
+      ].join(" ")).includes(q);
+    });
+  }
+
+  function sortedTaskRows(tasks) {
+    return [...tasks].sort((a, b) => {
+      const key = activeTaskSort.key;
+      const dir = activeTaskSort.direction === "asc" ? 1 : -1;
+      if (["priorityScore", "ageDays", "dueDays"].includes(key)) return compareNullableNumber(a[key], b[key], dir);
+      const av = String(a[key] || "").toLowerCase();
+      const bv = String(b[key] || "").toLowerCase();
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return compareNullableNumber(a.priorityScore, b.priorityScore, -1);
+    });
+  }
+
+  function uniqueTaskValues(key) {
+    return [...new Set(openTaskRows().map(task => cleanText(task[key])).filter(Boolean))].sort();
+  }
+
+  function taskAgeDays(task) {
+    const created = toDate(task.createdDate);
+    if (!created) return 0;
+    return Math.max(0, Math.round((todayDate() - created) / 86400000));
+  }
+
+  function taskDueDays(task) {
+    const due = toDate(task.dueDate);
+    if (!due) return null;
+    return Math.round((due - todayDate()) / 86400000);
+  }
+
+  function calculateTaskPriority(task, row) {
+    const reasons = [];
+    let score = 0;
+    taskPriorityRules().filter(rule => rule.enabled !== false).forEach(rule => {
+      if (!taskPriorityRuleMatches(task, row, rule)) return;
+      let ruleScore = Number(rule.baseScore || 0);
+      const agePoints = Math.min(Number(rule.maxAgePoints || 0), task.ageDays * Number(rule.agePointsPerDay || 0));
+      ruleScore += agePoints;
+      if (task.dueDays !== null) {
+        if (task.dueDays < 0) ruleScore += Number(rule.overduePoints || 0);
+        else if (task.dueDays <= Number(rule.dueWithinDays || 0)) ruleScore += Number(rule.dueSoonPoints || 0);
+      }
+      if (rule.useClientStatusTieBreaker) ruleScore += Number(TASK_STATUS_TIE_BREAKER_POINTS[validStatus(task.clientStatus)] || 0);
+      score += ruleScore;
+      reasons.push(`${rule.name}: ${Math.round(ruleScore)}`);
+    });
+    if (!score) {
+      score = task.priority === "Urgent" ? 700 : task.priority === "High" ? 400 : task.priority === "Low" ? 50 : 100;
+      reasons.push(`Priority fallback: ${score}`);
+    }
+    return { score, reasons };
+  }
+
+  function taskPriorityRuleMatches(task, row, rule) {
+    if (rule.category && task.category !== rule.category) return false;
+    if (rule.priority && task.priority !== rule.priority) return false;
+    if (rule.clientStatus && validStatus(task.clientStatus) !== rule.clientStatus) return false;
+    if (rule.sourceColumn && !commaListMatches(rule.sourceColumn, task.sourceColumn)) return false;
+    const searchable = `${task.title || ""} ${task.notes || ""} ${task.sourceColumn || ""}`;
+    if (rule.keyword && !commaListMatches(rule.keyword, searchable)) return false;
+    return true;
+  }
+
+  function commaListMatches(listText, valueText) {
+    const value = normalizeTextKey(valueText);
+    return String(listText || "")
+      .split(",")
+      .map(normalizeTextKey)
+      .filter(Boolean)
+      .some(item => value.includes(item));
+  }
+
+  function inferTaskCategory(task) {
+    const text = normalizeTextKey(`${task.sourceColumn || ""} ${task.title || ""} ${task.notes || ""}`);
+    if (["TRADE", "ORDER", "REBALANCE", "BUY", "SELL"].some(word => text.includes(word))) return "Trades/Orders";
+    if (text.includes("NEXT CONTACT") || text.includes("EMAIL") || ["FOLLOW", "CONTACT", "CALL"].some(word => text.includes(word))) return "Client Follow Up";
+    if (text.includes("REVIEW") || text.includes("NEXT STEP") || text.includes("MEETING")) return "Review Meeting Next Steps";
+    if (text.includes("AVAILABLE CASH") || text.includes("CASH") || text.includes("LIQUIDITY")) return "Cash Review";
+    if (text.includes("ASSET ALLOCATION") || text.includes("ALLOCATION") || text.includes("DRIFT")) return "Allocation Review";
+    if (text.includes("ONLINE ACTIVITY") || text.includes("LOGIN") || text.includes("MSO")) return "Online Activity";
+    if (text.includes("FINANCIAL PLAN") || text.includes("PLAN") || text.includes("GPS")) return "Planning";
+    return "Other";
+  }
+
+  function normalizeTaskTags(tags) {
+    if (Array.isArray(tags)) return tags.map(cleanText).filter(Boolean);
+    return String(tags || "").split(",").map(cleanText).filter(Boolean);
+  }
+
+  function taskPriorityRules() {
+    if (!Array.isArray(appState.settings.taskPriorityRules) || !appState.settings.taskPriorityRules.length) {
+      appState.settings.taskPriorityRules = clone(DEFAULT_TASK_PRIORITY_RULES);
+    }
+    return appState.settings.taskPriorityRules;
   }
 
   function renderAppIcons() {
@@ -2137,6 +2634,36 @@
     return `<span class="settingsIconFallback">${DEFAULT_APP_ICONS[key] || ""}</span>`;
   }
 
+  function applyButtonTooltips(root = document) {
+    root.querySelectorAll("button, a.smallButton").forEach(button => {
+      if (button.title) return;
+      const text = cleanText(button.textContent || button.getAttribute("aria-label") || "");
+      const classTooltip = button.classList.contains("deleteListItem") ? "Delete this value from the settings list."
+        : button.classList.contains("addListItem") ? "Add the typed value to this settings list."
+        : button.classList.contains("editTask") ? "Edit the selected task."
+        : button.classList.contains("completeTask") ? "Mark the selected task completed."
+        : button.classList.contains("archiveTask") ? "Archive the selected task without permanently deleting it."
+        : button.classList.contains("deleteTask") ? "Permanently delete the selected task."
+        : button.classList.contains("starNote") ? "Toggle whether this note is starred."
+        : button.classList.contains("editNote") ? "Edit the selected note text."
+        : button.classList.contains("archiveNote") ? "Archive the selected note without permanently deleting it."
+        : button.classList.contains("deleteNote") ? "Permanently delete the selected note."
+        : button.classList.contains("deleteTaskPriorityRule") ? "Delete this task prioritization rule."
+        : button.classList.contains("openTaskClient") ? "Open the client Tasks popup for this task."
+        : button.classList.contains("deleteWorkbookConfig") ? "Remove this custom workbook configuration."
+        : button.classList.contains("editRelationship") ? "Edit this relationship mapping predicate."
+        : button.classList.contains("toggleRelationship") ? "Enable or disable this relationship validation mapping."
+        : button.classList.contains("deleteRelationship") ? "Delete this relationship mapping."
+        : button.classList.contains("deleteTemplate") ? "Delete this email template."
+        : button.classList.contains("clearIcon") ? "Clear this uploaded icon override."
+        : button.classList.contains("deleteActivity") ? "Delete this activity log entry."
+        : button.classList.contains("deleteFamily") ? "Remove this family or relationship entry from the client profile."
+        : button.classList.contains("popupUrlButton") ? "Open the linked client URL in a new browser tab."
+        : "";
+      button.title = BUTTON_TOOLTIPS_BY_ID[button.id] || classTooltip || (text ? `Press to run: ${text}.` : "Press this button to perform its action.");
+    });
+  }
+
   function openPopup(row, col, event) {
     closePopup();
     activePopup = { rowId: row.id, colKey: col.key };
@@ -2158,6 +2685,7 @@
     layer.querySelector(".popupBackdrop").addEventListener("click", closePopup);
     layer.querySelector("#popupClose").addEventListener("click", closePopup);
     wirePopup(row, col);
+    applyButtonTooltips(layer);
   }
 
   function closePopup() {
@@ -2192,6 +2720,23 @@
     if (col.key === "tasks") return tasksBody(row);
     if (col.key === "notes") return notesBody(row, "notes");
     return genericBody(row, col);
+  }
+
+  function popupLinkButtons(row, links) {
+    return `<div class="popupActionRow">${links.map(link => {
+      const url = algUrlForRow(row, link.field);
+      const disabled = url ? "" : "disabled";
+      const title = url ? `Open ${link.label}` : `${link.label} URL missing in ref_ALG`;
+      return `<button class="smallButton popupUrlButton" data-popup-url="${escapeHtml(url)}" ${disabled} title="${escapeHtml(title)}">${escapeHtml(link.label)}</button>`;
+    }).join("")}</div>`;
+  }
+
+  function algUrlForRow(row, fieldName) {
+    const existing = cleanText(row.algLinks?.[fieldName]);
+    if (existing) return existing;
+    const clientKey = normalizeTextKey(row.id);
+    const alg = (runtime.importedTables.ref_ALG || []).find(item => normalizeTextKey(item.ID_NAME_ALG) === clientKey);
+    return cleanText(alg?.[fieldName]);
   }
 
   function statusBody(row) {
@@ -2251,7 +2796,7 @@
       <div class="sectionTitle"></div>
       <button id="openEmailDraft" class="smallButton">Open Mailto Draft</button>
       <button id="downloadOutlookDraft" class="smallButton">Download Outlook Draft JSON</button>
-      <div class="cellMuted sectionHint">Opening a draft does not log contact activity. Sent email logging comes from the Outlook VBA helper export.</div>
+      <div class="cellMuted sectionHint">Opening a draft does not log contact activity. Sent email logging comes from the Excel-hosted Outlook helper export.</div>
       ${notesEditor(row, "email")}`;
   }
 
@@ -2289,7 +2834,7 @@
       </div>
       <div class="sectionTitle"></div>
       <button id="saveContactLog" class="smallButton">Save Interaction</button>
-      ${row.nextContact?.days < 0 ? `<div class="miniCard cellDanger">Overdue contact alert is active for this client.</div>` : ""}
+      ${row.nextContact?.days < 0 ? `<div class="miniCard cellDanger">Temporary note: next contact date is overdue for this client.</div>` : ""}
       ${notesEditor(row, "nextContact")}`;
   }
 
@@ -2345,12 +2890,14 @@
       ${objectBreakdownTable(summary.cashBreakdown, ["taxable", "ira", "total"])}
       <div class="sectionTitle">Maturing Securities Next 30 Days</div>
       ${simpleRowsTable(summary.maturityList, ["securityName", "accountKey", "date", "days", "marketValue"])}
+      ${row.availableCashAlert ? `<div class="miniCard cellDanger">Temporary note: calculated cash balance is outside the configured min/max bounds for this client.</div>` : ""}
       ${notesEditor(row, "availableCash")}`;
   }
 
   function totalAssetsBody(row) {
     const summary = row.summaries?.positions || emptyPositionSummary();
     return `
+      ${popupLinkButtons(row, [{ label: "3D", field: "url_ALG" }])}
       <div class="popupGrid">
         <label>Morgan Stanley Total</label><div>${escapeHtml(formatMoney(summary.msAssets))}</div>
         <label>External Total</label><div>${escapeHtml(formatMoney(summary.externalAssets))}</div>
@@ -2397,6 +2944,7 @@
   function financialPlanBody(row) {
     const summary = row.summaries?.financial || {};
     return `
+      ${popupLinkButtons(row, [{ label: "GPS", field: "url_GPS" }])}
       <div class="popupGrid">
         <label>Likelihood of Success</label><div>${escapeHtml(row.financialPlan || "N/A")}</div>
         <label>GPS Status</label><div>${escapeHtml(summary.status || "N/A")}</div>
@@ -2410,6 +2958,7 @@
   function onlineActivityBody(row) {
     const summary = row.onlineActivity || {};
     return `
+      ${popupLinkButtons(row, [{ label: "MSO", field: "url_MSO" }])}
       <div class="popupGrid">
         <label>Status</label><div>${summary.className ? `<span class="activityDot ${escapeHtml(summary.className)}"></span>` : `<span class="cellMuted">N/A</span>`}</div>
         <label>Last Login</label><div>${escapeHtml(summary.lastLoginDate || "N/A")}</div>
@@ -2425,6 +2974,8 @@
       <div class="popupGrid">
         <label>Title</label><input id="taskTitle">
         <label>Due Date</label><input id="taskDueDate" type="date">
+        <label>Category</label>${taskCategorySelect("taskCategory", "")}
+        <label>Tags</label><input id="taskTags" placeholder="comma-separated tags">
         <label>Priority</label><select id="taskPriority">${(appState.settings.taskPriorities || DEFAULT_TASK_PRIORITIES).map(p => `<option ${p === "Normal" ? "selected" : ""}>${escapeHtml(p)}</option>`).join("")}</select>
         <label>Status</label><select id="taskStatus">${(appState.settings.taskStatuses || DEFAULT_TASK_STATUSES).map(s => `<option>${escapeHtml(s)}</option>`).join("")}</select>
         <label>Recurrence</label><input id="taskRecurrence" placeholder="Placeholder">
@@ -2437,10 +2988,12 @@
   }
 
   function taskCard(task) {
+    const enriched = enrichTaskForPriority(task);
     return `
       <div class="miniCard">
-        <div class="miniCardHeader"><span>${escapeHtml(task.priority)} / ${escapeHtml(task.status)} / ${escapeHtml(task.dueDate || "No due date")}</span><span>${escapeHtml(task.source || "manual")}</span></div>
+        <div class="miniCardHeader"><span>${escapeHtml(enriched.priority)} / ${escapeHtml(enriched.status)} / ${escapeHtml(enriched.dueDate || "No due date")} / Score ${escapeHtml(Math.round(enriched.priorityScore))}</span><span>${escapeHtml(enriched.source || "manual")}</span></div>
         <strong>${escapeHtml(task.title)}</strong>
+        <div class="cellMuted">${escapeHtml(enriched.category)}${enriched.tags.length ? ` / ${escapeHtml(enriched.tags.join(", "))}` : ""}${enriched.sourceColumn ? ` / ${escapeHtml(enriched.sourceColumn)}` : ""}</div>
         <div>${escapeHtml(task.notes || "")}</div>
         <div class="cardActions">
           <button class="smallButton editTask" data-task-id="${escapeHtml(task.id)}">Edit</button>
@@ -2449,6 +3002,10 @@
           <button class="smallButton deleteTask" data-task-id="${escapeHtml(task.id)}">Delete</button>
         </div>
       </div>`;
+  }
+
+  function taskCategorySelect(id, selected) {
+    return `<select id="${escapeHtml(id)}">${TASK_CATEGORY_OPTIONS.map(category => `<option value="${escapeHtml(category)}" ${category === selected ? "selected" : ""}>${escapeHtml(category)}</option>`).join("")}</select>`;
   }
 
   function notesBody(row, columnKey) {
@@ -2532,6 +3089,12 @@
       saveState({ type: "family_archive", clientGroupId: row.id, columnKey: "clientName", summary: "Archived family/relationship entry" });
       render();
       reopenActivePopup();
+    }));
+
+    document.querySelectorAll(".popupUrlButton").forEach(button => button.addEventListener("click", () => {
+      const url = cleanText(button.dataset.popupUrl);
+      if (!url) return;
+      window.open(url, "_blank", "noopener");
     }));
 
     const addNote = document.getElementById("addNote");
@@ -2618,11 +3181,15 @@
     if (addTask) addTask.addEventListener("click", () => {
       const title = document.getElementById("taskTitle").value.trim();
       if (!title) return;
+      const category = document.getElementById("taskCategory").value || "Other";
+      const tags = normalizeTaskTags(document.getElementById("taskTags").value || `${category}, Tasks`);
       appState.tasks.unshift({
         id: uid("task"),
         clientGroupId: row.id,
         title,
         dueDate: document.getElementById("taskDueDate").value || null,
+        category,
+        tags,
         priority: document.getElementById("taskPriority").value,
         status: document.getElementById("taskStatus").value,
         notes: document.getElementById("taskNotes").value.trim(),
@@ -2630,7 +3197,8 @@
         completedDate: null,
         recurrence: document.getElementById("taskRecurrence").value.trim() || null,
         archivedDate: null,
-        source: "manual"
+        source: "manual",
+        sourceColumn: "Tasks"
       });
       saveState({ type: "task_add", clientGroupId: row.id, columnKey: "tasks", summary: `Added task: ${title}` });
       render();
@@ -2663,6 +3231,8 @@
       mutateTask(task.id, item => {
         item.title = title.trim();
         item.notes = prompt("Edit task notes", item.notes || "") ?? item.notes;
+        item.category = prompt("Edit task category", item.category || inferTaskCategory(item)) || item.category || inferTaskCategory(item);
+        item.tags = normalizeTaskTags(prompt("Edit comma-separated task tags", normalizeTaskTags(item.tags).join(", ")) ?? item.tags);
       }, "task_edit", "Edited task");
     }));
   }
@@ -2722,6 +3292,7 @@
     }));
     document.getElementById("settingsPanel").innerHTML = settingsPanel(activeSettingsSection);
     wireSettings();
+    applyButtonTooltips(document.getElementById("settingsPanel"));
   }
 
   function settingsPanel(section) {
@@ -2730,7 +3301,7 @@
     if (section === "Status") return statusSettings();
     if (section === "Client Profile") return clientProfileSettings();
     if (section === "Email") return emailSettings();
-    if (section === "VBA Outlook Helper") return outlookHelperSettings();
+    if (section === "Excel Outlook Helper" || section === "VBA Outlook Helper") return outlookHelperSettings();
     if (section === "Next Contact") return nextContactSettings();
     if (section === "T12 Revenue") return t12Settings();
     if (section === "NNA") return nnaSettings();
@@ -2782,7 +3353,7 @@
         <button id="validateMappings" class="smallButton">Validate Mappings</button>
         <div class="cellMuted sectionHint">${window.XLSX ? "SheetJS loaded locally." : "SheetJS missing. Place lib/xlsx.full.min.js next to index.html."} Browser security requires one folder grant before automatic refresh can read the saved folder.</div>
         ${warnings.map(message => `<div class="miniCard cellWarn">${escapeHtml(message)}</div>`).join("")}
-        <table class="popupTable"><thead><tr><th>File</th><th>Header Row</th><th>Status</th><th>Rows</th><th>Message</th></tr></thead><tbody>${statuses.map(s => `<tr><td>${escapeHtml(s.fileName)}</td><td>${escapeHtml(s.headerRow || DEFAULT_WORKBOOK_HEADER_ROW)}</td><td class="${s.status === "loaded" ? "cellSuccess" : s.required ? "cellDanger" : "cellWarn"}">${escapeHtml(s.status)}</td><td>${escapeHtml(s.rowCount ?? "")}</td><td>${escapeHtml(s.message || "")}</td></tr>`).join("")}</tbody></table>
+        <table class="popupTable"><thead><tr><th>File</th><th>Header Row</th><th>Status</th><th>Rows</th><th>Message</th><th>Column Details</th></tr></thead><tbody>${statuses.map(s => `<tr><td>${escapeHtml(s.fileName)}</td><td>${escapeHtml(s.headerRow || DEFAULT_WORKBOOK_HEADER_ROW)}</td><td class="${s.status === "loaded" ? "cellSuccess" : s.required ? "cellDanger" : "cellWarn"}">${escapeHtml(s.status)}</td><td>${escapeHtml(s.rowCount ?? "")}</td><td>${escapeHtml(s.message || "")}</td><td>${fileStatusColumnDetails(s)}</td></tr>`).join("")}</tbody></table>
       </div>
       <div class="settingsCard">
         <div class="sectionTitle">Configured Workbook Tables</div>
@@ -2820,6 +3391,20 @@
         <div class="sectionTitle">Tables</div>
         ${tableCards()}
       </div>`;
+  }
+
+  function fileStatusColumnDetails(status) {
+    const parts = [];
+    if (status.missingColumns?.length) parts.push(`<div><strong>Missing:</strong> ${escapeHtml(status.missingColumns.join(", "))}</div>`);
+    if (status.mismatchedColumns?.length) {
+      parts.push(`<div><strong>Mismatched:</strong> ${escapeHtml(status.mismatchedColumns.map(item => `#${item.position} expected "${item.expected}", found "${item.actual}"`).join("; "))}</div>`);
+    }
+    if (status.outOfOrderColumns?.length) {
+      parts.push(`<div><strong>Out of order:</strong> ${escapeHtml(status.outOfOrderColumns.map(item => `${item.field} expected #${item.expectedPosition}, found #${item.actualPosition}`).join("; "))}</div>`);
+    }
+    if (status.extraColumns?.length) parts.push(`<div><strong>Unexpected:</strong> ${escapeHtml(status.extraColumns.join(", "))}</div>`);
+    if (status.duplicateColumns?.length) parts.push(`<div><strong>Duplicates:</strong> ${escapeHtml(status.duplicateColumns.map(item => `${item.header} x${item.count}`).join(", "))}</div>`);
+    return parts.join("") || `<span class="cellMuted">N/A</span>`;
   }
 
   function relationshipDiagram() {
@@ -2888,7 +3473,8 @@
     const sentCount = appState.activityLog.filter(entry => entry.type === "sent_email_log").length;
     return `
       <div class="settingsCard">
-        <div class="sectionTitle">VBA Outlook Helper</div>
+        <div class="sectionTitle">Excel Outlook Helper</div>
+        <ol class="setupSteps">${VBA_OUTLOOK_HELPER_SETUP_STEPS.map(step => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
         <div class="popupGrid">
           <label>Max Emails Per Address</label><input data-setting="outlookMaxEmailsPerAddress" type="number" min="1" max="500" value="${Number(appState.settings.outlookMaxEmailsPerAddress || DEFAULT_OUTLOOK_MAX_EMAILS_PER_ADDRESS)}">
           <label>Lookback Days</label><input data-setting="outlookLookbackDays" type="number" min="1" max="3650" value="${Number(appState.settings.outlookLookbackDays || DEFAULT_OUTLOOK_LOOKBACK_DAYS)}">
@@ -2902,16 +3488,16 @@
         </div>
         <div class="sectionTitle">Files</div>
         <div class="cardActions">
-          <button id="exportOutlookClients" class="smallButton">Export Client Email JSON</button>
-          <button id="exportOutlookConfig" class="smallButton">Export Helper Config JSON</button>
-          <a class="smallButton linkButton" href="vba/AM_CRM_Outlook_Helper.bas" download>VBA Module</a>
+          <button id="exportOutlookClients" class="smallButton" title="Download the client email JSON file that the Excel-hosted Outlook helper reads.">Export Client Email JSON</button>
+          <button id="exportOutlookConfig" class="smallButton" title="Download helper settings used by the Excel-hosted Outlook VBA module.">Export Helper Config JSON</button>
+          <a class="smallButton linkButton" href="vba/AM_CRM_Outlook_Helper.bas" download title="Download the VBA module file that should be imported into Excel and saved inside an .xlsm helper workbook.">VBA Module</a>
         </div>
         <div class="sectionTitle">Imports</div>
         <div class="cardActions">
-          <button id="importOutlookRecentEmails" class="smallButton">Import Recent Email JSON</button>
-          <button id="importOutlookSentLog" class="smallButton">Import Sent Log JSON</button>
-          <button id="importOutlookTasks" class="smallButton">Import Task JSON</button>
-          <button id="clearOutlookEmailHistory" class="smallButton">Clear Recent History</button>
+          <button id="importOutlookRecentEmails" class="smallButton" title="Select and import the recent email history JSON created by the Excel-hosted Outlook helper.">Import Recent Email JSON</button>
+          <button id="importOutlookSentLog" class="smallButton" title="Select and import the sent email log JSON created by the Excel-hosted Outlook helper so sent emails count as client contact.">Import Sent Log JSON</button>
+          <button id="importOutlookTasks" class="smallButton" title="Select and import task-candidate JSON created by the Excel-hosted Outlook helper.">Import Task JSON</button>
+          <button id="clearOutlookEmailHistory" class="smallButton" title="Remove all recent Outlook email history currently stored in this app.">Clear Recent History</button>
         </div>
         <input id="outlookRecentEmailsInput" class="hidden" type="file" accept=".json,application/json">
         <input id="outlookSentLogInput" class="hidden" type="file" accept=".json,application/json">
@@ -2938,7 +3524,7 @@
   }
 
   function availableCashSettings() {
-    return `<div class="settingsCard"><div class="sectionTitle">Available Cash</div><div class="popupGrid"><label>Include Held-Away Cash</label>${settingsSelect("includeHeldAwayCash", String(appState.settings.includeHeldAwayCash), ["true", "false"], ["Yes", "No"])}<label>Default Min</label><input data-setting="defaultMinAvailableCash" type="number" value="${Number(appState.settings.defaultMinAvailableCash || 0)}"><label>Default Max</label><input data-setting="defaultMaxAvailableCash" type="number" value="${Number(appState.settings.defaultMaxAvailableCash || 100000)}"></div><div class="sectionTitle">Cash Keywords</div>${listEditor("cashKeywords", appState.settings.cashKeywords || DEFAULT_SETTINGS.cashKeywords)}</div>`;
+    return `<div class="settingsCard"><div class="sectionTitle">Available Cash</div><div class="popupGrid"><label>Include Held-Away Cash</label>${settingsSelect("includeHeldAwayCash", String(appState.settings.includeHeldAwayCash), ["true", "false"], ["Yes", "No"])}<label>Default Min</label><input data-setting="defaultMinAvailableCash" type="number" value="${Number(appState.settings.defaultMinAvailableCash || 0)}"><label>Default Max</label><input data-setting="defaultMaxAvailableCash" type="number" value="${Number(appState.settings.defaultMaxAvailableCash || 100000)}"></div><div class="sectionTitle">Cash Keywords</div><div class="cellMuted sectionHint">Exact matches only in data_POSITIONS columns: ${escapeHtml(CASH_KEYWORD_POSITION_FIELDS.join(", "))}.</div>${listEditor("cashKeywords", appState.settings.cashKeywords || DEFAULT_SETTINGS.cashKeywords)}</div>`;
   }
 
   function totalAssetsSettings() {
@@ -2967,7 +3553,8 @@
   }
 
   function taskSettings() {
-    return `<div class="settingsCard"><div class="sectionTitle">Task Statuses</div>${listEditor("taskStatuses", appState.settings.taskStatuses || DEFAULT_TASK_STATUSES)}<div class="sectionTitle">Task Priorities</div>${listEditor("taskPriorities", appState.settings.taskPriorities || DEFAULT_TASK_PRIORITIES)}<div class="popupGrid"><label>Recurring Task Placeholder</label>${settingsSelect("recurrencePlaceholderEnabled", String(appState.settings.recurrencePlaceholderEnabled), ["true", "false"], ["Enabled", "Disabled"])}</div></div>`;
+    return `<div class="settingsCard"><div class="sectionTitle">Task Statuses</div>${listEditor("taskStatuses", appState.settings.taskStatuses || DEFAULT_TASK_STATUSES)}<div class="sectionTitle">Task Priorities</div>${listEditor("taskPriorities", appState.settings.taskPriorities || DEFAULT_TASK_PRIORITIES)}<div class="popupGrid"><label>Recurring Task Placeholder</label>${settingsSelect("recurrencePlaceholderEnabled", String(appState.settings.recurrencePlaceholderEnabled), ["true", "false"], ["Enabled", "Disabled"])}</div></div>
+      <div class="settingsCard"><div class="sectionTitle">Prioritization Rules</div>${taskPriorityRuleEditor()}<button id="addTaskPriorityRule" class="smallButton" title="Add a new task prioritization rule.">Add Rule</button><button id="resetTaskPriorityRules" class="smallButton" title="Reset task prioritization rules back to the app defaults.">Reset Rules</button></div>`;
   }
 
   function noteSettings() {
@@ -2988,7 +3575,54 @@
   }
 
   function llmSettings() {
-    return `<div class="settingsCard"><div class="sectionTitle">LLM Export / Import</div><button id="exportLlmJson" class="smallButton">Export LLM JSON</button><button id="importLlmJson" class="smallButton">Import LLM Task JSON</button><input id="importLlmInput" class="hidden" type="file" accept=".json"><pre>${escapeHtml(JSON.stringify(llmExportPayload().clients[0] || {}, null, 2))}</pre></div>`;
+    return `<div class="settingsCard"><div class="sectionTitle">LLM Export / Import</div>
+      <div class="cardActions">
+        <button id="exportLlmJson" class="smallButton" title="Import available Outlook helper JSON files from the saved folder, refresh saved workbook data, rebuild the LLM app data JSON, and copy the prompt plus JSON to the clipboard.">Export LLM JSON</button>
+        <button id="importLlmJson" class="smallButton" title="Open a popup where an LLM task JSON response can be pasted and imported into client tasks.">Import LLM Task JSON</button>
+      </div>
+      <div class="sectionTitle">Prepend Prompt</div>
+      <textarea id="llmPrependPrompt" data-setting="llmPrependPrompt" class="llmPromptBox">${escapeHtml(appState.settings.llmPrependPrompt || DEFAULT_LLM_PREPEND_PROMPT)}</textarea>
+      <div class="sectionTitle">Datapoints</div>
+      ${llmExportFieldSettings()}
+      <div class="sectionTitle">App Data JSON</div>
+      <textarea id="llmExportPreview" class="llmPreviewBox" readonly>${escapeHtml(llmExportJsonText())}</textarea>
+    </div>`;
+  }
+
+  function taskPriorityRuleEditor() {
+    return taskPriorityRules().map((rule, idx) => `
+      <div class="miniCard taskRuleCard">
+        <div class="miniCardHeader"><strong>${escapeHtml(rule.name || `Rule ${idx + 1}`)}</strong><button class="smallButton deleteTaskPriorityRule" data-task-rule-index="${idx}" title="Delete this task prioritization rule.">Delete</button></div>
+        <div class="popupGrid">
+          <label>Enabled</label><input data-task-rule-index="${idx}" data-task-rule-field="enabled" type="checkbox" ${rule.enabled !== false ? "checked" : ""}>
+          <label>Name</label><input data-task-rule-index="${idx}" data-task-rule-field="name" value="${escapeHtml(rule.name || "")}">
+          <label>Category</label>${taskRuleSelect(idx, "category", rule.category || "", ["", ...TASK_CATEGORY_OPTIONS], ["Any", ...TASK_CATEGORY_OPTIONS])}
+          <label>Source Column Contains</label><input data-task-rule-index="${idx}" data-task-rule-field="sourceColumn" value="${escapeHtml(rule.sourceColumn || "")}">
+          <label>Keyword Contains</label><input data-task-rule-index="${idx}" data-task-rule-field="keyword" value="${escapeHtml(rule.keyword || "")}">
+          <label>Client Status</label>${taskRuleSelect(idx, "clientStatus", rule.clientStatus || "", ["", ...STATUS_ORDER], ["Any", ...STATUS_ORDER])}
+          <label>Task Priority</label>${taskRuleSelect(idx, "priority", rule.priority || "", ["", ...DEFAULT_TASK_PRIORITIES], ["Any", ...DEFAULT_TASK_PRIORITIES])}
+          <label>Base Score</label><input data-task-rule-index="${idx}" data-task-rule-field="baseScore" type="number" value="${Number(rule.baseScore || 0)}">
+          <label>Age Points / Day</label><input data-task-rule-index="${idx}" data-task-rule-field="agePointsPerDay" type="number" value="${Number(rule.agePointsPerDay || 0)}">
+          <label>Max Age Points</label><input data-task-rule-index="${idx}" data-task-rule-field="maxAgePoints" type="number" value="${Number(rule.maxAgePoints || 0)}">
+          <label>Due Within Days</label><input data-task-rule-index="${idx}" data-task-rule-field="dueWithinDays" type="number" value="${Number(rule.dueWithinDays || 0)}">
+          <label>Due Soon Points</label><input data-task-rule-index="${idx}" data-task-rule-field="dueSoonPoints" type="number" value="${Number(rule.dueSoonPoints || 0)}">
+          <label>Overdue Points</label><input data-task-rule-index="${idx}" data-task-rule-field="overduePoints" type="number" value="${Number(rule.overduePoints || 0)}">
+          <label>Status Tie Breaker</label><input data-task-rule-index="${idx}" data-task-rule-field="useClientStatusTieBreaker" type="checkbox" ${rule.useClientStatusTieBreaker ? "checked" : ""}>
+        </div>
+      </div>`).join("");
+  }
+
+  function taskRuleSelect(idx, field, selected, values, labels) {
+    return `<select data-task-rule-index="${idx}" data-task-rule-field="${escapeHtml(field)}">${values.map((value, valueIdx) => `<option value="${escapeHtml(value)}" ${String(selected) === String(value) ? "selected" : ""}>${escapeHtml(labels[valueIdx])}</option>`).join("")}</select>`;
+  }
+
+  function llmExportFieldSettings() {
+    const visibility = llmExportFieldVisibility();
+    return COLUMN_DEFS.map(col => {
+      const items = LLM_EXPORT_DATAPOINTS.filter(item => item.columnKey === col.key);
+      if (!items.length) return "";
+      return `<div class="miniCard"><div class="miniCardHeader"><strong>${escapeHtml(col.label)}</strong><span>${items.length} datapoints</span></div>${items.map(item => `<label class="checkRow"><input type="checkbox" data-llm-export-key="${escapeHtml(item.key)}" ${visibility[item.key] !== false ? "checked" : ""}> ${escapeHtml(item.label)}</label>`).join("")}</div>`;
+    }).join("");
   }
 
   function settingsSelect(key, selected, values, labels = null) {
@@ -3258,6 +3892,59 @@
       render();
     }));
 
+    document.querySelectorAll("[data-task-rule-field]").forEach(input => input.addEventListener("change", () => {
+      const rule = taskPriorityRules()[Number(input.dataset.taskRuleIndex)];
+      if (!rule) return;
+      const field = input.dataset.taskRuleField;
+      if (input.type === "checkbox") rule[field] = input.checked;
+      else if (input.type === "number") rule[field] = Number(input.value || 0);
+      else rule[field] = input.value;
+      saveState({ type: "task_priority_rule_edit", summary: `Changed task priority rule ${rule.name || rule.id}` });
+      render();
+    }));
+
+    document.querySelectorAll(".deleteTaskPriorityRule").forEach(button => button.addEventListener("click", () => {
+      appState.settings.taskPriorityRules = taskPriorityRules().filter((_, idx) => idx !== Number(button.dataset.taskRuleIndex));
+      saveState({ type: "task_priority_rule_delete", summary: "Deleted task priority rule" });
+      renderSettings();
+      if (isTasksVisible()) renderTasksView();
+    }));
+
+    document.getElementById("addTaskPriorityRule")?.addEventListener("click", () => {
+      taskPriorityRules().push({
+        id: uid("task_rule"),
+        enabled: true,
+        name: "New priority rule",
+        category: "",
+        sourceColumn: "",
+        keyword: "",
+        clientStatus: "",
+        priority: "",
+        baseScore: 100,
+        agePointsPerDay: 0,
+        maxAgePoints: 0,
+        dueWithinDays: 0,
+        dueSoonPoints: 0,
+        overduePoints: 0,
+        useClientStatusTieBreaker: false
+      });
+      saveState({ type: "task_priority_rule_add", summary: "Added task priority rule" });
+      renderSettings();
+    });
+
+    document.getElementById("resetTaskPriorityRules")?.addEventListener("click", () => {
+      appState.settings.taskPriorityRules = clone(DEFAULT_TASK_PRIORITY_RULES);
+      saveState({ type: "task_priority_rule_reset", summary: "Reset task priority rules" });
+      render();
+    });
+
+    document.querySelectorAll("[data-llm-export-key]").forEach(input => input.addEventListener("change", () => {
+      appState.settings.llmExportFieldVisibility = llmExportFieldVisibility();
+      appState.settings.llmExportFieldVisibility[input.dataset.llmExportKey] = input.checked;
+      saveState({ type: "llm_export_field_toggle", summary: `Changed LLM export field ${input.dataset.llmExportKey}` });
+      renderSettings();
+    }));
+
     document.querySelectorAll("[data-icon-key]").forEach(input => {
       if (input.type !== "file") return;
       input.addEventListener("change", async () => {
@@ -3292,9 +3979,8 @@
     document.getElementById("outlookRecentEmailsInput")?.addEventListener("change", importOutlookRecentEmailsFromInput);
     document.getElementById("outlookSentLogInput")?.addEventListener("change", importOutlookSentLogFromInput);
     document.getElementById("outlookTasksInput")?.addEventListener("change", importOutlookTasksFromInput);
-    document.getElementById("exportLlmJson")?.addEventListener("click", () => downloadJson(`AM_CRM_LLM_EXPORT_${timestampForFile()}.json`, llmExportPayload()));
-    document.getElementById("importLlmJson")?.addEventListener("click", () => document.getElementById("importLlmInput").click());
-    document.getElementById("importLlmInput")?.addEventListener("change", importLlmFromInput);
+    document.getElementById("exportLlmJson")?.addEventListener("click", () => runLlmExport());
+    document.getElementById("importLlmJson")?.addEventListener("click", openLlmImportPopup);
 
     document.querySelectorAll(".deleteActivity").forEach(button => button.addEventListener("click", () => {
       appState.activityLog = appState.activityLog.filter(item => item.id !== button.dataset.activityId);
@@ -3347,7 +4033,7 @@
     const file = event.target.files[0];
     if (!file) return;
     const payload = JSON.parse(await file.text());
-    const count = importLlmTasks({ ...payload, source: payload.source || "outlook_vba_helper" });
+    const count = importLlmTasks({ ...payload, source: payload.source || "excel_outlook_vba_helper" });
     rememberOutlookImport("task_candidates", file.name, count);
     saveState({ type: "outlook_task_import", summary: `Imported ${count} Outlook task candidates from ${file.name}` });
     render();
@@ -3385,10 +4071,11 @@
       appVersion: APP_VERSION,
       settings: outlookHelperConfig(),
       macros: {
-        openDraftFromJson: "AMCRM_OpenDraftFromJsonFile",
-        exportRecentEmails: "AMCRM_ExportRecentEmailsFromClientJson",
-        exportSentEmailLog: "AMCRM_ExportSentEmailLogFromClientJson",
-        exportTaskCandidates: "AMCRM_ExportTaskCandidatesFromClientJson"
+        runAllExports: "AMCRM_Excel_RunAllExports",
+        openDraftFromJson: "AMCRM_Excel_OpenDraftFromJson",
+        exportRecentEmails: "AMCRM_Excel_ExportRecentEmails",
+        exportSentEmailLog: "AMCRM_Excel_ExportSentEmailLog",
+        exportTaskCandidates: "AMCRM_Excel_ExportTaskCandidates"
       }
     };
   }
@@ -3543,6 +4230,89 @@
     return cleanText(value).toLowerCase();
   }
 
+  async function runLlmExport() {
+    const promptInput = document.getElementById("llmPrependPrompt");
+    if (promptInput) appState.settings.llmPrependPrompt = promptInput.value;
+    const outlookImport = await refreshOutlookHelperDataFromSavedFolder();
+    await autoRefreshSavedFolder(true);
+    render();
+    const jsonText = llmExportJsonText();
+    const preview = document.getElementById("llmExportPreview");
+    if (preview) preview.value = jsonText;
+    const copiedText = `${appState.settings.llmPrependPrompt || DEFAULT_LLM_PREPEND_PROMPT}\n\n${jsonText}`;
+    const copied = await copyTextToClipboard(copiedText);
+    saveState({ type: "llm_export_copy", summary: `Prepared LLM export. Outlook helper files imported: ${outlookImport.importedFiles}. Clipboard ${copied ? "copy succeeded" : "copy failed"}.` });
+    render();
+    if (!copied) {
+      downloadBlob(`AM_CRM_LLM_EXPORT_${timestampForFile()}.txt`, copiedText, "text/plain");
+      alert("Clipboard copy was blocked by the browser. A text file with the prompt and JSON was downloaded instead.");
+      return;
+    }
+    alert("LLM prompt and app data JSON copied to clipboard.");
+  }
+
+  async function refreshOutlookHelperDataFromSavedFolder() {
+    const result = { importedFiles: 0, importedItems: 0 };
+    const handle = await loadDirectoryHandle();
+    if (!handle) return result;
+    const permission = await verifyDirectoryPermission(handle, true);
+    if (!permission) return result;
+    const recent = await readJsonFromDirectory(handle, appState.settings.outlookRecentEmailsFilename || DEFAULT_OUTLOOK_RECENT_EMAILS_FILENAME);
+    if (recent.payload) {
+      const count = mergeOutlookEmailHistory(outlookEmailItemsFromPayload(recent.payload));
+      rememberOutlookImport("recent_email_history", recent.fileName, count);
+      result.importedFiles += 1;
+      result.importedItems += count;
+    }
+    const sent = await readJsonFromDirectory(handle, appState.settings.outlookSentLogFilename || DEFAULT_OUTLOOK_SENT_LOG_FILENAME);
+    if (sent.payload) {
+      const count = importOutlookSentEmailLog(sent.payload);
+      rememberOutlookImport("sent_email_log", sent.fileName, count);
+      result.importedFiles += 1;
+      result.importedItems += count;
+    }
+    if (result.importedFiles) saveState({ type: "outlook_auto_import", summary: `Auto-imported ${result.importedItems} Outlook helper items before LLM export.` });
+    return result;
+  }
+
+  async function readJsonFromDirectory(handle, fileName) {
+    const cleanName = cleanText(fileName);
+    if (!cleanName) return { fileName: cleanName, payload: null };
+    try {
+      const fileHandle = await handle.getFileHandle(cleanName);
+      const file = await fileHandle.getFile();
+      return { fileName: cleanName, payload: JSON.parse(await file.text()) };
+    } catch (err) {
+      return { fileName: cleanName, payload: null };
+    }
+  }
+
+  async function copyTextToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        console.warn("Clipboard API copy failed.", err);
+      }
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch (err) {
+      copied = false;
+    }
+    textarea.remove();
+    return copied;
+  }
+
   async function importLlmFromInput(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -3552,89 +4322,186 @@
     render();
   }
 
+  function openLlmImportPopup() {
+    closePopup();
+    const layer = document.getElementById("popupLayer");
+    layer.innerHTML = `
+      <div class="popupBackdrop"></div>
+      <div class="popupCard modal">
+        <div class="popupHeader">
+          <div class="popupTitle">Import LLM Task JSON</div>
+          <button id="popupClose" class="smallButton" title="Close this import popup without importing tasks.">Close</button>
+        </div>
+        <div class="popupBody">
+          <textarea id="llmImportText" class="llmImportBox" placeholder="Paste the LLM JSON response here"></textarea>
+          <div class="cardActions">
+            <button id="submitLlmImport" class="smallButton" title="Parse the pasted LLM JSON and add the tasks to the matching clients.">Submit</button>
+          </div>
+        </div>
+      </div>`;
+    layer.querySelector(".popupBackdrop").addEventListener("click", closePopup);
+    layer.querySelector("#popupClose").addEventListener("click", closePopup);
+    layer.querySelector("#submitLlmImport").addEventListener("click", submitLlmImportText);
+    applyButtonTooltips(layer);
+  }
+
+  function submitLlmImportText() {
+    const text = document.getElementById("llmImportText")?.value.trim();
+    if (!text) return;
+    try {
+      const payload = JSON.parse(text);
+      const count = importLlmTasks(payload);
+      saveState({ type: "llm_import", summary: `Imported ${count} LLM tasks from pasted JSON` });
+      render();
+      closePopup();
+      switchView("tasks");
+      alert(`Imported ${count} tasks.`);
+    } catch (err) {
+      alert(`Invalid LLM task JSON: ${err.message}`);
+    }
+  }
+
   function importLlmTasks(payload) {
     let count = 0;
+    const existingKeys = new Set((appState.tasks || []).map(taskImportKey));
     (payload.tasks || payload.nextBestActions || []).forEach(task => {
       if (!task.clientGroupId || !task.title) return;
+      const matchedClient = gridRows.find(row => normalizeTextKey(row.id) === normalizeTextKey(task.clientGroupId));
+      if (!matchedClient) return;
+      const record = {
+        clientGroupId: matchedClient.id,
+        title: cleanText(task.title),
+        dueDate: task.dueDate || null,
+        category: normalizeTaskCategory(task.category || inferTaskCategory(task)),
+        tags: normalizeTaskTags(task.tags),
+        priority: validTaskPriority(task.priority),
+        status: validTaskStatus(task.status),
+        notes: cleanText(task.notes || task.reasoning || ""),
+        recurrence: task.recurrence || null,
+        source: task.source || payload.source || "llm_import",
+        sourceColumn: cleanText(task.sourceColumn || "Tasks"),
+        reasoning: cleanText(task.reasoning || "")
+      };
+      if (!record.tags.length) record.tags = normalizeTaskTags(`${record.category}, ${record.sourceColumn}`);
+      const key = taskImportKey(record);
+      if (existingKeys.has(key)) return;
+      existingKeys.add(key);
       appState.tasks.unshift({
         id: uid("task"),
-        clientGroupId: task.clientGroupId,
-        title: task.title,
-        dueDate: task.dueDate || null,
-        priority: task.priority || "Normal",
-        status: task.status || "Open",
-        notes: task.notes || task.reasoning || "",
+        ...record,
         createdDate: new Date().toISOString(),
         completedDate: null,
-        recurrence: task.recurrence || null,
-        archivedDate: null,
-        source: task.source || payload.source || "llm_import",
-        sourceColumn: task.sourceColumn || null
+        archivedDate: null
       });
-      addActivity({ type: "llm_task_import", clientGroupId: task.clientGroupId, columnKey: task.sourceColumn || "tasks", summary: `Imported LLM task: ${task.title}` }, false);
+      addActivity({ type: "llm_task_import", clientGroupId: record.clientGroupId, columnKey: record.sourceColumn || "tasks", summary: `Imported LLM task: ${record.title}` }, false);
       count += 1;
     });
     return count;
   }
 
+  function taskImportKey(task) {
+    return [normalizeTextKey(task.clientGroupId), normalizeTextKey(task.title), formatDate(task.dueDate), normalizeTextKey(task.sourceColumn)].join("|");
+  }
+
+  function normalizeTaskCategory(category) {
+    const clean = cleanText(category);
+    return TASK_CATEGORY_OPTIONS.includes(clean) ? clean : "Other";
+  }
+
+  function validTaskPriority(priority) {
+    const clean = cleanText(priority);
+    return (appState.settings.taskPriorities || DEFAULT_TASK_PRIORITIES).includes(clean) ? clean : "Normal";
+  }
+
+  function validTaskStatus(status) {
+    const clean = cleanText(status);
+    return (appState.settings.taskStatuses || DEFAULT_TASK_STATUSES).includes(clean) ? clean : "Open";
+  }
+
+  function llmExportClipboardText() {
+    return `${appState.settings.llmPrependPrompt || DEFAULT_LLM_PREPEND_PROMPT}\n\n${llmExportJsonText()}`;
+  }
+
+  function llmExportJsonText() {
+    return JSON.stringify(llmExportPayload(), null, 2);
+  }
+
+  function llmExportFieldVisibility() {
+    return { ...DEFAULT_LLM_EXPORT_FIELD_VISIBILITY, ...(appState.settings.llmExportFieldVisibility || {}) };
+  }
+
   function llmExportPayload() {
+    const visibility = llmExportFieldVisibility();
+    const include = key => visibility[key] !== false;
     return {
       exportType: "AM_CRM_LLM_CLIENT_ANALYSIS",
       generatedAt: new Date().toISOString(),
       appVersion: APP_VERSION,
       source: "AM_CRM local browser app",
-      clients: gridRows.map(row => ({
-        clientGroupId: row.id,
-        clientProfile: {
+      includedDatapoints: LLM_EXPORT_DATAPOINTS.filter(item => include(item.key)).map(item => item.key),
+      taskImportInstructions: {
+        expectedImportExportType: "AM_CRM_LLM_TASK_IMPORT",
+        requiredTaskFields: ["clientGroupId", "title"],
+        supportedCategories: TASK_CATEGORY_OPTIONS,
+        supportedPriorities: appState.settings.taskPriorities || DEFAULT_TASK_PRIORITIES,
+        supportedStatuses: appState.settings.taskStatuses || DEFAULT_TASK_STATUSES
+      },
+      clients: gridRows.map(row => {
+        const client = { clientGroupId: row.id };
+        if (include("clientProfile")) client.clientProfile = {
           clientName: row.clientName,
           salutation: row.salutation,
-          emails: row.emails,
           riskProfile: row.riskProfile,
           includeAlts: row.includeAlts,
           includeMunis: row.includeMunis,
           contactFrequency: row.contactFrequencyCode,
           reviewFrequency: row.reviewFrequencyCode
-        },
-        status: {
+        };
+        if (include("emailAddresses")) client.emailAddresses = row.emails || splitEmails(row.email);
+        if (include("recentEmails")) client.recentEmails = (appState.outlookEmailHistory || []).filter(item => (item.clientGroupId || findClientIdForEmail(item.matchedAddress)) === row.id).slice(0, 25);
+        if (include("status")) client.status = {
           importedOrDisplayed: row.status,
           calculated: calculateStatusTier(row).tier
-        },
-        t12Revenue: row.t12Revenue,
-        nna: row.nna,
-        availableCash: {
+        };
+        if (include("t12Revenue")) client.t12Revenue = row.t12Revenue;
+        if (include("nna")) client.nna = row.nna;
+        if (include("availableCash")) client.availableCash = {
           rawTotal: row.availableCashRaw,
           excess: row.availableCash,
           percentOfAssets: row.availableCashPercent,
           minimum: row.minAvailableCash,
           maximum: row.maxAvailableCash,
           alert: row.availableCashAlert
-        },
-        totalAssets: row.totalAssets,
-        advisoryAssets: {
+        };
+        if (include("totalAssets")) client.totalAssets = row.totalAssets;
+        if (include("advisoryAssets")) client.advisoryAssets = {
           value: row.advisoryAssets,
           percentOfAssets: row.advisoryPercent
-        },
-        assetAllocation: row.summaries?.positions?.allocationRows || [],
-        financialPlan: row.summaries?.financial || { display: row.financialPlan },
-        onlineActivity: row.onlineActivity || {},
-        lastContact: row.lastContactDate,
-        nextContact: row.nextContact,
-        openTasks: appState.tasks.filter(task => task.clientGroupId === row.id && !task.archivedDate && !["Completed", "Cancelled"].includes(task.status)),
-        importantNotes: appState.notes.filter(note => note.clientGroupId === row.id && !note.archivedDate && note.starred),
-        notes: appState.notes.filter(note => note.clientGroupId === row.id && !note.archivedDate),
-        recentActivityLog: appState.activityLog.filter(entry => entry.clientGroupId === row.id).slice(0, 20),
-        columnSpecificAlerts: row.alerts || [],
-        suggestedRuleBasedNextBestActions: nextBestActions(row)
-      }))
+        };
+        if (include("assetAllocation")) client.assetAllocation = row.summaries?.positions?.allocationRows || [];
+        if (include("financialPlan")) client.financialPlan = row.summaries?.financial || { display: row.financialPlan };
+        if (include("onlineActivity")) client.onlineActivity = row.onlineActivity || {};
+        if (include("nextContact")) {
+          client.lastContact = row.lastContactDate;
+          client.nextContact = row.nextContact;
+        }
+        if (include("openTasks")) client.openTasks = openTaskRows().filter(task => task.clientGroupId === row.id);
+        if (include("importantNotes")) client.importantNotes = appState.notes.filter(note => note.clientGroupId === row.id && !note.archivedDate && note.starred);
+        if (include("notes")) client.notes = appState.notes.filter(note => note.clientGroupId === row.id && !note.archivedDate);
+        if (include("recentActivityLog")) client.recentActivityLog = appState.activityLog.filter(entry => entry.clientGroupId === row.id).slice(0, 20);
+        if (include("columnSpecificAlerts")) client.columnSpecificAlerts = row.alerts || [];
+        if (include("ruleBasedActions")) client.suggestedRuleBasedNextBestActions = nextBestActions(row);
+        return client;
+      })
     };
   }
 
   function nextBestActions(row) {
     const actions = [];
-    if (row.nextContact?.days !== null && row.nextContact.days < 0) actions.push({ sourceColumn: "Next Contact", priority: "High", title: "Schedule overdue client contact" });
-    if (row.availableCashAlert && Number(row.availableCash || 0) > 0) actions.push({ sourceColumn: "Available Cash", priority: "High", title: "Review excess available cash" });
-    if (row.assetAllocation === "DRIFT") actions.push({ sourceColumn: "Asset Allocation", priority: "Normal", title: "Review allocation drift" });
-    if (row.financialPlan === "N/A") actions.push({ sourceColumn: "Financial Plan", priority: "Normal", title: "Check financial plan status" });
+    if (row.nextContact?.days !== null && row.nextContact.days < 0) actions.push({ sourceColumn: "Next Contact", category: "Client Follow Up", tags: ["overdue-contact"], priority: "High", title: "Schedule overdue client contact" });
+    if (row.availableCashAlert && Number(row.availableCash || 0) > 0) actions.push({ sourceColumn: "Available Cash", category: "Cash Review", tags: ["cash-outside-bounds"], priority: "High", title: "Review excess available cash" });
+    if (row.assetAllocation === "DRIFT") actions.push({ sourceColumn: "Asset Allocation", category: "Allocation Review", tags: ["allocation-drift"], priority: "Normal", title: "Review allocation drift" });
+    if (row.financialPlan === "N/A") actions.push({ sourceColumn: "Financial Plan", category: "Planning", tags: ["financial-plan"], priority: "Normal", title: "Check financial plan status" });
     return actions;
   }
 
@@ -3711,6 +4578,8 @@
     document.querySelectorAll(".navButton").forEach(button => button.classList.toggle("active", button.dataset.view === view));
     document.querySelectorAll(".view").forEach(section => section.classList.toggle("active", section.id === `${view}View`));
     if (view === "settings") renderSettings();
+    if (view === "tasks") renderTasksView();
+    applyButtonTooltips();
   }
 
   function detectField(rows, words) {
