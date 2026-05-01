@@ -1,8 +1,10 @@
 Attribute VB_Name = "AM_CRM_Outlook_Helper"
 Option Explicit
 
-' AM_CRM Outlook helper.
-' Import this module into an Outlook or Excel VBA project.
+' AM_CRM Excel-hosted Outlook helper.
+' Import this module into Excel, then save the workbook as AM_CRM_Outlook_Helper.xlsm.
+' Run the AMCRM_Excel_* macros from Excel's Macro dialog. Do not use Outlook's Visual Basic editor.
+' Outlook's Visual Basic editor is not required; Excel automates Outlook through late binding.
 ' These routines only display drafts or export logs. They never send mail.
 
 ' Outlook MailItem type used by late-bound CreateItem.
@@ -22,6 +24,9 @@ Private Const DEFAULT_LOOKBACK_DAYS As Long = 365
 
 ' Default number of email body characters written to JSON previews.
 Private Const DEFAULT_BODY_PREVIEW_CHARS As Long = 750
+
+' Default input filename exported from AM_CRM for the Excel-hosted Outlook helper.
+Private Const DEFAULT_CLIENT_EMAIL_INPUT_FILE As String = "AM_CRM_Outlook_Client_Emails.json"
 
 ' Default output filename for recent inbox and sent email history.
 Private Const DEFAULT_RECENT_EMAIL_OUTPUT_FILE As String = "AM_CRM_Outlook_Recent_Emails.json"
@@ -44,13 +49,49 @@ Private Const DEFAULT_TASK_STATUS As String = "Open"
 ' MAPI property tag used to resolve Exchange address entries to SMTP addresses.
 Private Const PR_SMTP_ADDRESS As String = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E"
 
+Public Sub AMCRM_Excel_RunAllExports()
+    Dim clientJsonPath As String
+    Dim outputFolderPath As String
+    Dim contacts As Collection
+
+    clientJsonPath = PromptForOpenPath("Select the AM_CRM client email JSON file", DEFAULT_CLIENT_EMAIL_INPUT_FILE)
+    If Len(Trim$(clientJsonPath)) = 0 Then Exit Sub
+    Set contacts = ContactsFromClientJsonPath(clientJsonPath)
+    If contacts Is Nothing Then Exit Sub
+
+    outputFolderPath = PromptForFolderPath("Select the output folder for AM_CRM Outlook JSON files", ParentFolderFromPath(clientJsonPath))
+    If Len(Trim$(outputFolderPath)) = 0 Then Exit Sub
+
+    ExportRecentEmailContacts contacts, CombinePath(outputFolderPath, DEFAULT_RECENT_EMAIL_OUTPUT_FILE), -1, -1, -1, False
+    ExportSentEmailContacts contacts, CombinePath(outputFolderPath, DEFAULT_SENT_LOG_OUTPUT_FILE), -1, -1, -1, False
+    ExportTaskCandidateContacts contacts, CombinePath(outputFolderPath, DEFAULT_TASK_OUTPUT_FILE), -1, -1, True, True, False
+
+    MsgBox "AM_CRM Outlook helper exports complete. Output folder: " & outputFolderPath, vbInformation, "AM_CRM Excel Outlook Helper"
+End Sub
+
+Public Sub AMCRM_Excel_ExportRecentEmails()
+    AMCRM_ExportRecentEmailsFromClientJson
+End Sub
+
+Public Sub AMCRM_Excel_ExportSentEmailLog()
+    AMCRM_ExportSentEmailLogFromClientJson
+End Sub
+
+Public Sub AMCRM_Excel_ExportTaskCandidates()
+    AMCRM_ExportTaskCandidatesFromClientJson
+End Sub
+
+Public Sub AMCRM_Excel_OpenDraftFromJson()
+    AMCRM_OpenDraftFromJsonFile
+End Sub
+
 Public Sub AMCRM_OpenDraftEmail(ByVal toList As String, Optional ByVal subjectText As String = "", Optional ByVal bodyText As String = "")
     Dim olApp As Object
     Dim mail As Object
 
     Set olApp = GetOutlookApplication()
     If olApp Is Nothing Then
-        MsgBox "Outlook is not available.", vbExclamation, "AM_CRM"
+        MsgBox "Outlook Desktop is not available. Open Outlook, sign in, then run the Excel macro again.", vbExclamation, "AM_CRM Excel Outlook Helper"
         Exit Sub
     End If
 
@@ -71,7 +112,7 @@ Public Sub AMCRM_OpenDraftFromJsonFile(Optional ByVal draftJsonPath As String = 
     Dim bodyText As String
 
     If Len(Trim$(draftJsonPath)) = 0 Then
-        draftJsonPath = PromptForPath("Draft JSON path", "AM_CRM_Outlook_Draft.json")
+        draftJsonPath = PromptForOpenPath("Select the AM_CRM draft JSON file", "AM_CRM_Outlook_Draft.json")
     End If
     If Len(Trim$(draftJsonPath)) = 0 Then Exit Sub
 
@@ -127,11 +168,7 @@ Public Sub AMCRM_ExportSentEmailLogFromClientJson(Optional ByVal clientJsonPath 
 End Sub
 
 Public Sub AMCRM_ExportTaskCandidatesFromClientJson(Optional ByVal clientJsonPath As String = "", Optional ByVal outputJsonPath As String = "", Optional ByVal lookbackDays As Long = -1, Optional ByVal bodyPreviewChars As Long = -1, Optional ByVal includeUnreadInbox As Boolean = True, Optional ByVal includeFlagged As Boolean = True)
-    Dim olApp As Object
-    Dim ns As Object
     Dim contacts As Collection
-    Dim tasksJson As String
-    Dim json As String
 
     Set contacts = ContactsFromClientJsonPath(clientJsonPath)
     If contacts Is Nothing Then Exit Sub
@@ -141,9 +178,18 @@ Public Sub AMCRM_ExportTaskCandidatesFromClientJson(Optional ByVal clientJsonPat
     End If
     If Len(Trim$(outputJsonPath)) = 0 Then Exit Sub
 
+    ExportTaskCandidateContacts contacts, outputJsonPath, lookbackDays, bodyPreviewChars, includeUnreadInbox, includeFlagged, True
+End Sub
+
+Private Sub ExportTaskCandidateContacts(ByVal contacts As Collection, ByVal outputJsonPath As String, ByVal lookbackDays As Long, ByVal bodyPreviewChars As Long, ByVal includeUnreadInbox As Boolean, ByVal includeFlagged As Boolean, Optional ByVal showCompletionMessage As Boolean = True)
+    Dim olApp As Object
+    Dim ns As Object
+    Dim tasksJson As String
+    Dim json As String
+
     Set olApp = GetOutlookApplication()
     If olApp Is Nothing Then
-        MsgBox "Outlook is not available.", vbExclamation, "AM_CRM"
+        MsgBox "Outlook Desktop is not available. Open Outlook, sign in, then run the Excel macro again.", vbExclamation, "AM_CRM Excel Outlook Helper"
         Exit Sub
     End If
 
@@ -152,12 +198,12 @@ Public Sub AMCRM_ExportTaskCandidatesFromClientJson(Optional ByVal clientJsonPat
     bodyPreviewChars = NonNegativeOrDefault(bodyPreviewChars, DEFAULT_BODY_PREVIEW_CHARS)
 
     tasksJson = TrimTrailingComma(ExportTaskFolderMatches(ns.GetDefaultFolder(OL_FOLDER_INBOX), contacts, lookbackDays, bodyPreviewChars, includeUnreadInbox, includeFlagged))
-    json = "{""exportType"":""AM_CRM_OUTLOOK_TASK_CANDIDATES"",""generatedAt"":""" & JsonEscape(FormatIso(Now)) & """,""source"":""AM_CRM_Outlook_Helper"",""tasks"":["
+    json = "{""exportType"":""AM_CRM_OUTLOOK_TASK_CANDIDATES"",""generatedAt"":""" & JsonEscape(FormatIso(Now)) & """,""source"":""AM_CRM_Excel_Outlook_Helper"",""tasks"":["
     json = json & tasksJson
     json = json & "]}"
 
     WriteTextFile outputJsonPath, json
-    MsgBox "Outlook task candidate export complete.", vbInformation, "AM_CRM"
+    If showCompletionMessage Then MsgBox "Outlook task candidate export complete.", vbInformation, "AM_CRM"
 End Sub
 
 Public Sub AMCRM_OpenDraftPrompt()
@@ -172,7 +218,7 @@ Public Sub AMCRM_OpenDraftPrompt()
     AMCRM_OpenDraftEmail toList, subjectText, bodyText
 End Sub
 
-Private Sub ExportRecentEmailContacts(ByVal contacts As Collection, ByVal outputJsonPath As String, ByVal maxPerAddress As Long, ByVal lookbackDays As Long, ByVal bodyPreviewChars As Long)
+Private Sub ExportRecentEmailContacts(ByVal contacts As Collection, ByVal outputJsonPath As String, ByVal maxPerAddress As Long, ByVal lookbackDays As Long, ByVal bodyPreviewChars As Long, Optional ByVal showCompletionMessage As Boolean = True)
     Dim olApp As Object
     Dim ns As Object
     Dim inboxJson As String
@@ -195,7 +241,7 @@ Private Sub ExportRecentEmailContacts(ByVal contacts As Collection, ByVal output
 
     Set olApp = GetOutlookApplication()
     If olApp Is Nothing Then
-        MsgBox "Outlook is not available.", vbExclamation, "AM_CRM"
+        MsgBox "Outlook Desktop is not available. Open Outlook, sign in, then run the Excel macro again.", vbExclamation, "AM_CRM Excel Outlook Helper"
         Exit Sub
     End If
 
@@ -207,17 +253,17 @@ Private Sub ExportRecentEmailContacts(ByVal contacts As Collection, ByVal output
     inboxJson = TrimTrailingComma(ExportFolderMatches(ns.GetDefaultFolder(OL_FOLDER_INBOX), contacts, maxPerAddress, "Inbox", lookbackDays, bodyPreviewChars))
     sentJson = TrimTrailingComma(ExportFolderMatches(ns.GetDefaultFolder(OL_FOLDER_SENT_MAIL), contacts, maxPerAddress, "Sent", lookbackDays, bodyPreviewChars))
 
-    json = "{""exportType"":""AM_CRM_OUTLOOK_RECENT_EMAILS"",""generatedAt"":""" & JsonEscape(FormatIso(Now)) & """,""source"":""AM_CRM_Outlook_Helper"",""emails"":["
+    json = "{""exportType"":""AM_CRM_OUTLOOK_RECENT_EMAILS"",""generatedAt"":""" & JsonEscape(FormatIso(Now)) & """,""source"":""AM_CRM_Excel_Outlook_Helper"",""emails"":["
     json = json & inboxJson
     If Len(inboxJson) > 0 And Len(sentJson) > 0 Then json = json & ","
     json = json & sentJson
     json = json & "]}"
 
     WriteTextFile outputJsonPath, json
-    MsgBox "Recent email export complete.", vbInformation, "AM_CRM"
+    If showCompletionMessage Then MsgBox "Recent email export complete.", vbInformation, "AM_CRM"
 End Sub
 
-Private Sub ExportSentEmailContacts(ByVal contacts As Collection, ByVal outputJsonPath As String, ByVal maxPerAddress As Long, ByVal lookbackDays As Long, ByVal bodyPreviewChars As Long)
+Private Sub ExportSentEmailContacts(ByVal contacts As Collection, ByVal outputJsonPath As String, ByVal maxPerAddress As Long, ByVal lookbackDays As Long, ByVal bodyPreviewChars As Long, Optional ByVal showCompletionMessage As Boolean = True)
     Dim olApp As Object
     Dim ns As Object
     Dim sentJson As String
@@ -239,7 +285,7 @@ Private Sub ExportSentEmailContacts(ByVal contacts As Collection, ByVal outputJs
 
     Set olApp = GetOutlookApplication()
     If olApp Is Nothing Then
-        MsgBox "Outlook is not available.", vbExclamation, "AM_CRM"
+        MsgBox "Outlook Desktop is not available. Open Outlook, sign in, then run the Excel macro again.", vbExclamation, "AM_CRM Excel Outlook Helper"
         Exit Sub
     End If
 
@@ -249,12 +295,12 @@ Private Sub ExportSentEmailContacts(ByVal contacts As Collection, ByVal outputJs
     bodyPreviewChars = NonNegativeOrDefault(bodyPreviewChars, DEFAULT_BODY_PREVIEW_CHARS)
 
     sentJson = TrimTrailingComma(ExportFolderMatches(ns.GetDefaultFolder(OL_FOLDER_SENT_MAIL), contacts, maxPerAddress, "Sent", lookbackDays, bodyPreviewChars))
-    json = "{""exportType"":""AM_CRM_OUTLOOK_SENT_EMAIL_LOG"",""generatedAt"":""" & JsonEscape(FormatIso(Now)) & """,""source"":""AM_CRM_Outlook_Helper"",""sentEmails"":["
+    json = "{""exportType"":""AM_CRM_OUTLOOK_SENT_EMAIL_LOG"",""generatedAt"":""" & JsonEscape(FormatIso(Now)) & """,""source"":""AM_CRM_Excel_Outlook_Helper"",""sentEmails"":["
     json = json & sentJson
     json = json & "]}"
 
     WriteTextFile outputJsonPath, json
-    MsgBox "Sent email log export complete.", vbInformation, "AM_CRM"
+    If showCompletionMessage Then MsgBox "Sent email log export complete.", vbInformation, "AM_CRM"
 End Sub
 
 Private Function ExportFolderMatches(ByVal folder As Object, ByVal contacts As Collection, ByVal maxPerAddress As Long, ByVal folderLabel As String, ByVal lookbackDays As Long, ByVal bodyPreviewChars As Long) As String
@@ -435,7 +481,7 @@ Private Function MailItemTaskJson(ByVal mail As Object, ByVal contact As Object,
         """priority"":""" & JsonEscape(priority) & """," & _
         """status"":""" & JsonEscape(DEFAULT_TASK_STATUS) & """," & _
         """notes"":""" & JsonEscape(notes) & """," & _
-        """source"":""outlook_vba_helper""," & _
+        """source"":""excel_outlook_vba_helper""," & _
         """sourceColumn"":""tasks""," & _
         """outlookEntryId"":""" & JsonEscape(mail.EntryID) & """," & _
         """emailTimestamp"":""" & JsonEscape(FormatIso(MailWhen(mail, "Inbox"))) & """," & _
@@ -461,7 +507,7 @@ Private Function ContactsFromClientJsonPath(ByVal clientJsonPath As String) As C
     Dim contacts As Collection
 
     If Len(Trim$(clientJsonPath)) = 0 Then
-        clientJsonPath = PromptForPath("Client email JSON path", "AM_CRM_Outlook_Client_Emails.json")
+        clientJsonPath = PromptForOpenPath("Select the AM_CRM client email JSON file", DEFAULT_CLIENT_EMAIL_INPUT_FILE)
     End If
     If Len(Trim$(clientJsonPath)) = 0 Then Exit Function
 
@@ -572,7 +618,61 @@ Private Function FormatIso(ByVal value As Date) As String
 End Function
 
 Private Function PromptForPath(ByVal promptText As String, ByVal defaultFileName As String) As String
-    PromptForPath = Trim$(InputBox(promptText, "AM_CRM Outlook Helper", DefaultDownloadPath(defaultFileName)))
+    PromptForPath = PromptForSavePath(promptText, defaultFileName)
+End Function
+
+Private Function PromptForOpenPath(ByVal promptText As String, ByVal defaultFileName As String) As String
+    Dim selectedPath As Variant
+
+    On Error Resume Next
+    selectedPath = Application.GetOpenFilename("JSON Files (*.json),*.json,All Files (*.*),*.*", , promptText)
+    If Err.Number = 0 And VarType(selectedPath) <> vbBoolean Then
+        PromptForOpenPath = CStr(selectedPath)
+        On Error GoTo 0
+        Exit Function
+    End If
+    Err.Clear
+    On Error GoTo 0
+
+    PromptForOpenPath = Trim$(InputBox(promptText, "AM_CRM Excel Outlook Helper", DefaultDownloadPath(defaultFileName)))
+End Function
+
+Private Function PromptForSavePath(ByVal promptText As String, ByVal defaultFileName As String) As String
+    Dim selectedPath As Variant
+
+    On Error Resume Next
+    selectedPath = Application.GetSaveAsFilename(DefaultDownloadPath(defaultFileName), "JSON Files (*.json),*.json,All Files (*.*),*.*", , promptText)
+    If Err.Number = 0 And VarType(selectedPath) <> vbBoolean Then
+        PromptForSavePath = CStr(selectedPath)
+        On Error GoTo 0
+        Exit Function
+    End If
+    Err.Clear
+    On Error GoTo 0
+
+    PromptForSavePath = Trim$(InputBox(promptText, "AM_CRM Excel Outlook Helper", DefaultDownloadPath(defaultFileName)))
+End Function
+
+Private Function PromptForFolderPath(ByVal promptText As String, ByVal defaultFolderPath As String) As String
+    Dim dialog As Object
+
+    On Error Resume Next
+    Set dialog = Application.FileDialog(4)
+    If Err.Number = 0 Then
+        With dialog
+            .Title = promptText
+            .InitialFileName = EnsureTrailingBackslash(defaultFolderPath)
+            If .Show = -1 Then
+                PromptForFolderPath = CStr(.SelectedItems(1))
+                On Error GoTo 0
+                Exit Function
+            End If
+        End With
+    End If
+    Err.Clear
+    On Error GoTo 0
+
+    PromptForFolderPath = Trim$(InputBox(promptText, "AM_CRM Excel Outlook Helper", defaultFolderPath))
 End Function
 
 Private Function DefaultDownloadPath(ByVal fileName As String) As String
@@ -584,6 +684,31 @@ Private Function DefaultDownloadPath(ByVal fileName As String) As String
     Else
         DefaultDownloadPath = CurDir$ & "\" & fileName
     End If
+End Function
+
+Private Function ParentFolderFromPath(ByVal filePath As String) As String
+    Dim slashPos As Long
+
+    slashPos = InStrRev(filePath, "\")
+    If slashPos > 0 Then
+        ParentFolderFromPath = Left$(filePath, slashPos - 1)
+    Else
+        ParentFolderFromPath = CurDir$
+    End If
+End Function
+
+Private Function EnsureTrailingBackslash(ByVal folderPath As String) As String
+    If Len(Trim$(folderPath)) = 0 Then
+        EnsureTrailingBackslash = CurDir$ & "\"
+    ElseIf Right$(folderPath, 1) = "\" Then
+        EnsureTrailingBackslash = folderPath
+    Else
+        EnsureTrailingBackslash = folderPath & "\"
+    End If
+End Function
+
+Private Function CombinePath(ByVal folderPath As String, ByVal fileName As String) As String
+    CombinePath = EnsureTrailingBackslash(folderPath) & fileName
 End Function
 
 Private Function GetOutlookApplication() As Object
