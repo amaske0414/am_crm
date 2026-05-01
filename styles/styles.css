@@ -672,6 +672,20 @@ td.stickyCol2 {
   color: var(--text);
 }
 
+.workbookConfigTable input {
+  width: 100%;
+  min-width: 72px;
+}
+
+.workbookConfigTable input[type="checkbox"] {
+  width: auto;
+  min-width: 0;
+}
+
+.workbookAddRow input {
+  min-width: 110px;
+}
+
 pre {
   white-space: pre-wrap;
   word-break: break-word;
